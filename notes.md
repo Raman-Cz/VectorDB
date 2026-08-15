@@ -29,6 +29,8 @@ Implemented the exact brute-force cosine baseline in C++.
 - `BruteForceIndex` normalizes vectors at insertion and queries at search time.
 - Search scans every vector and returns sorted exact top-K results using a bounded min-heap.
 - A CTest case verifies ranking, normalization, and rejection of zero-norm vectors.
+- Vectors are stored in one flat contiguous `std::vector<float>` rather than individually allocated rows.
 - The benchmark defaults to 100,000 random 128-dimensional vectors and reports QPS.
+- Recorded baseline on 2026-08-15: 100 queries, top-K 10, 0.57 seconds total, 175.63 QPS. The CTest suite passed before recording this result.
 
-Next: record a baseline run on the default dataset, then study why KD-trees, Ball Trees, and LSH degrade or lose competitiveness for high-dimensional embeddings before implementing IVF.
+Next: study why KD-trees, Ball Trees, and LSH degrade or lose competitiveness for high-dimensional embeddings before implementing IVF.

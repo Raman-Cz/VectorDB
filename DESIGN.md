@@ -12,6 +12,8 @@ Vectors are normalized when inserted. Queries are normalized once per search. Th
 
 Search examines every stored vector and maintains only the current top-K results in a min-heap. This has predictable exact recall and uses O(K) extra search memory, but its linear scan makes it unsuitable as the final index at large scale. IVF and HNSW must be evaluated against it for recall and throughput.
 
+The benchmark reports QPS, while the CTest suite validates the same index's ranking behavior, normalization, and zero-norm rejection. This separates performance measurement from correctness checking without using a different search implementation for either.
+
 ## C++ Implementation Strategy
 
 - Use C++ for the eventual storage engine and search algorithms.

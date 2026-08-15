@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. The exact brute-force cosine-search baseline is implemented and tested; it will be used to measure recall and speed improvements for IVF and HNSW.
+Phase 4 (ANN Algorithms) is in progress. Step 1, the exact brute-force cosine-search baseline, is implemented and tested; it will be used to measure recall and speed improvements for IVF and HNSW.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -23,6 +23,8 @@ The Python BM25 and WAL code are disposable learning exercises. Production-orien
 
 `vector_db` creates random vectors, normalizes them on insertion, performs exact top-K cosine search, and reports query throughput. Since all indexed vectors and each query are normalized, cosine similarity is computed as a dot product.
 
+Vectors are stored in one flat contiguous `std::vector<float>` of `vector_count * dimensions` values, rather than as separately allocated vector rows. The benchmark reports performance only; the CTest case validates the same `BruteForceIndex` implementation for normalized ranking, sorted top-K results, and zero-norm input rejection.
+
 ```powershell
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
@@ -40,6 +42,10 @@ Run the correctness test with:
 ```powershell
 ctest --test-dir build -C Release --output-on-failure
 ```
+
+### Recorded Baseline
+
+One local Release run on 2026-08-15 completed 100 queries against 100,000 random 128-dimensional vectors with top-K 10 in 0.57 seconds: **175.63 QPS**. Throughput will vary by hardware and background load; rerun this command before comparing a future IVF or HNSW implementation.
 
 ## Project Structure
 
