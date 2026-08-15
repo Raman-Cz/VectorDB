@@ -1,39 +1,57 @@
 # Vector DB Engine Project
 
-A high-performance vector database implementation in C++ with focus on:
-- Memory-efficient storage
-- ANN search algorithms (HNSW, IVFFlat)
-- Cache-aware design
-- WAL-based crash recovery
+A C++ vector database learning project focused on memory-aware storage, approximate nearest-neighbor search, cache-aware design, and WAL-based crash recovery.
 
-## Language Choice
-- **Core implementation:** C++ (for performance and systems credibility)
-- **Learning exercises:** Python (for rapid prototyping of BM25, WAL demos)
+## Current Progress
 
-## Learning Phases
+Phase 4 (ANN Algorithms) is in progress. The exact brute-force cosine-search baseline is implemented and tested; it will be used to measure recall and speed improvements for IVF and HNSW.
 
 | Phase | Topic | Status |
-|-------|-------|--------|
-| 0 | Mental Model (Qdrant, Weaviate, pgvector architecture) | Done |
-| 1 | IR Foundations (Manning Ch. 1, 2, 6, 7) | Done |
-| 2 | Linear Algebra (dot product, normalization, curse of dim.) | Next |
-| 3 | Storage Engine Internals (DDIA, Database Internals, WAL toy) | In Progress |
-| 4 | ANN Algorithms (IVF, PQ, HNSW) | Planned |
-| 5 | Read FAISS Source | Planned |
-| 6 | Memory/Cache Performance Model | Planned |
-| 7 | Build the Vector Database (6-8 weeks) | Planned |
+| --- | --- | --- |
+| 0 | Mental model: Qdrant, Weaviate, pgvector | Done |
+| 1 | Information-retrieval foundations | Done |
+| 2 | Linear algebra: dot product, normalization, dimensionality | Done |
+| 3 | Storage internals and WAL learning exercise | Done |
+| 4 | ANN algorithms: baseline, IVF, PQ, HNSW | In progress |
+| 5 | Read FAISS source | Planned |
+| 6 | Memory and cache performance model | Planned |
+| 7 | Build the persistent vector database | Planned |
+
+The Python BM25 and WAL code are disposable learning exercises. Production-oriented database work remains planned for Phase 7.
+
+## Brute-Force Baseline
+
+`vector_db` creates random vectors, normalizes them on insertion, performs exact top-K cosine search, and reports query throughput. Since all indexed vectors and each query are normalized, cosine similarity is computed as a dot product.
+
+```powershell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+.\build\Release\vector_db.exe
+```
+
+Default benchmark parameters are 100,000 vectors, 128 dimensions, 100 queries, and top-K 10. Override them with:
+
+```powershell
+.\build\Release\vector_db.exe [vector_count] [dimensions] [query_count] [top_k]
+```
+
+Run the correctness test with:
+
+```powershell
+ctest --test-dir build -C Release --output-on-failure
+```
 
 ## Project Structure
-```
+
+```text
 VectorDB/
-├── src/
-│   ├── main.cpp              # C++ entry point
-│   └── python/
-│       ├── bm25_index.py     # BM25 exercise (Phase 1)
-│       ├── append_only_log.py # WAL exercise (Phase 3)
-│       └── test_wal.py       # Crash recovery tests
-├── tests/
-├── DESIGN.md                 # Design trade-offs
-├── notes.md                  # Learning log
-└── README.md
+  src/
+    brute_force_index.hpp       Reusable exact cosine-search interface
+    brute_force_index.cpp       Contiguous-vector brute-force implementation
+    main.cpp                    Benchmark command-line program
+    python/                     Disposable learning exercises
+  tests/
+    brute_force_index_test.cpp  Exact-result correctness test
+  DESIGN.md                     Architectural choices and trade-offs
+  notes.md                      Learning log
 ```

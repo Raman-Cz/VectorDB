@@ -1,35 +1,42 @@
 # Design Trade-offs
 
-## pgvector Trade-off
-pgvector makes the trade-off of sacrificing some search performance and scalability to integrate seamlessly with PostgreSQL. This allows for:
-- No separate infrastructure needed
-- Transactional consistency across relational and vector data
-- Simpler deployment and maintenance
-- Native SQL integration for complex queries
+## Project Boundary
+
+The current C++ code is an exact-search benchmark, not a persistent vector database. The Python BM25 and WAL examples are learning exercises and are not planned as production components. Persistent segments, metadata, WAL integration, and ANN indexes belong to Phase 7.
+
+## Brute-Force Cosine Baseline
+
+`BruteForceIndex` stores vectors in one contiguous `std::vector<float>`. This keeps every vector's components adjacent in memory and gives later ANN implementations a clear exact-search baseline.
+
+Vectors are normalized when inserted. Queries are normalized once per search. The resulting cosine similarity is then a dot product, so each candidate score is a single linear pass over its dimensions without recomputing vector norms.
+
+Search examines every stored vector and maintains only the current top-K results in a min-heap. This has predictable exact recall and uses O(K) extra search memory, but its linear scan makes it unsuitable as the final index at large scale. IVF and HNSW must be evaluated against it for recall and throughput.
 
 ## C++ Implementation Strategy
-- Use C++ for core storage engine and search algorithms
-- Implement memory-aware data structures (cache lines, struct packing)
-- Use Python for learning exercises (BM25 index, WAL demo)
 
-## ANN Philosophy (from IR Ch. 7)
-Exact top-K is often not worth the cost — approximate is fine if it's close. This is the entire justification for approximate nearest neighbor search.
+- Use C++ for the eventual storage engine and search algorithms.
+- Keep vector storage contiguous before introducing graph or inverted-list structures.
+- Use deterministic random data in the benchmark so local comparisons are repeatable.
+- Add focused correctness tests before treating a benchmark as a recall baseline.
 
-### Cluster Pruning → IVF
-Cluster pruning from classical IR (leaders/followers) is IVF's direct conceptual ancestor:
-- **Leaders** = cluster centroids
-- **Followers** = vectors assigned to nearest centroid
-- **Query time**: search only the nearest cluster(s) instead of the full dataset
-- **b1/b2 parameters** = IVF's `nprobe` (how many clusters to search)
+## pgvector Trade-off
 
-Why IVF misses the true nearest neighbor: it's a boundary/partition problem, not a local minimum problem. A query near a cluster boundary may have its true nearest neighbor in an adjacent cluster that never gets examined. The fix is probing more clusters (wider net), not searching harder within one cluster.
+pgvector sacrifices some search performance and scalability to integrate directly with PostgreSQL. The trade-off provides simpler deployment, transactional consistency with relational data, and SQL support for combined relational and vector queries.
 
-### LSM vs B+ Tree
-- **LSM trees**: write-optimized, append-only segments with periodic compaction. Better for write-heavy workloads.
-- **B+ trees**: read-optimized, in-place updates with balanced tree structure. Better for point lookups and range scans.
+## ANN Philosophy
 
-### Crash Recovery
-WAL (Write-Ahead Log) is append-only by design — this prevents corruption because:
-1. Each mutation is appended to the log before touching the primary data structure
-2. On restart, replay the log to reconstruct state
-3. Append-only means you never overwrite a committed record — at worst you lose the last incomplete write
+Exact top-K search is the correctness reference. Approximate search is useful only when it provides a meaningful speed or memory benefit while preserving acceptable recall.
+
+### Cluster Pruning to IVF
+
+Cluster pruning from classical IR is IVF's conceptual ancestor:
+
+- Leaders become cluster centroids.
+- Followers become vectors assigned to their nearest centroid.
+- Query-time cluster selection becomes IVF's `nprobe` setting.
+
+IVF can miss a true nearest neighbor near a cluster boundary because the relevant adjacent cluster may not be searched. Increasing `nprobe` widens the search at the cost of more work.
+
+## Storage Learning Notes
+
+LSM trees favor write-heavy workloads through append-only segments and compaction. B+ trees favor point lookups and range scans through balanced in-place structure. The WAL exercise demonstrates that replaying complete append-only records can restore state after an interrupted write.
