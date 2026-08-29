@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. Step 1, the exact brute-force cosine-search baseline, is implemented and tested; it will be used to measure recall and speed improvements for IVF and HNSW.
+Phase 4 (ANN Algorithms) is in progress. Steps 1 and 2 are complete: the exact brute-force baseline is implemented and tested, and the KD-tree, Ball Tree, and LSH failure modes have been studied. The IVF reading is complete; implementation is deliberately deferred until the next scoped task.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -18,6 +18,14 @@ Phase 4 (ANN Algorithms) is in progress. Step 1, the exact brute-force cosine-se
 | 7 | Build the persistent vector database | Planned |
 
 The Python BM25 and WAL code are disposable learning exercises. Production-oriented database work remains planned for Phase 7.
+
+## Current ANN Focus
+
+The next index is a basic CPU IVF implementation, but no IVF code has been started. The relevant FAISS paper reading is the IVFADC discussion in **Section 2 (Problem Statement)**. The roadmap's reference to Section 3 is a section-number mismatch: Section 3 covers GPU architecture and GPU k-selection, which are outside this single-threaded CPU project's current scope.
+
+The first IVF version will use k-means centroids, assign each vector to one inverted list, select the nearest `nprobe` centroids for each query, and scan only their lists using the existing exact similarity function. It will not include residual compression or product quantization; those belong to the later PQ step.
+
+The chosen design for the first IVF version is documented in `DESIGN.md`; implementation remains intentionally deferred.
 
 ## Brute-Force Baseline
 
