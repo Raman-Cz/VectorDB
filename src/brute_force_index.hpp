@@ -1,14 +1,11 @@
 #pragma once
 
+#include "search_result.hpp"
+
 #include <cstddef>
 #include <vector>
 
 namespace vectordb {
-
-struct SearchResult {
-    std::size_t id;
-    float score;
-};
 
 class BruteForceIndex {
 public:

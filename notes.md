@@ -56,4 +56,10 @@ Read and simplified the IVFADC explanation from the FAISS paper. The roadmap's r
 
 The brute-force baseline is 175.63 QPS, or approximately 5.7 ms per query, for 100,000 vectors at 128 dimensions. A first IVF experiment that probes roughly 10% of balanced clusters should scan about 10% of the dataset after centroid routing. Prediction: a 5-10x QPS improvement with some recall loss. Record the observed QPS and recall against this prediction when IVF is implemented.
 
-Next: scope the chosen basic CPU IVF design in `DESIGN.md`. No IVF code has been started.
+### Basic CPU IVF: Complete
+
+Implemented and tested `IVFIndex` using the selected design: spherical k-means, one contiguous normalized vector store, vector-ID inverted lists, and dot-product routing/scoring. Full probing (`nprobe = nlist`) is tested to match exact `BruteForceIndex` top-K results.
+
+The 100,000-vector default benchmark completed with `nlist = 316` and a 293.57-second training time. At `nprobe = 8`, IVF reached 1856.11 QPS versus 67.17 QPS for exact search in the same run, a 27.6x speedup. Recall@10 was 0.18, confirming the expected speed/recall trade-off and identifying recall tuning as the next evaluation concern. The long CPU-bound training phase caused substantial timing variation, so these are reference measurements rather than stable hardware limits.
+
+Next: study and implement Product Quantization as the next Phase 4 step. Keep IVF and PQ separate initially so their individual memory, speed, and recall effects remain understandable.

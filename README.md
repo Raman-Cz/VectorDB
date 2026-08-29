@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. Steps 1 and 2 are complete: the exact brute-force baseline is implemented and tested, and the KD-tree, Ball Tree, and LSH failure modes have been studied. The IVF reading is complete; implementation is deliberately deferred until the next scoped task.
+Phase 4 (ANN Algorithms) is in progress. Steps 1-3 are complete: the exact brute-force baseline, failed-approach study, and basic CPU IVF implementation are complete and benchmarked.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -19,13 +19,23 @@ Phase 4 (ANN Algorithms) is in progress. Steps 1 and 2 are complete: the exact b
 
 The Python BM25 and WAL code are disposable learning exercises. Production-oriented database work remains planned for Phase 7.
 
-## Current ANN Focus
+## Basic CPU IVF
 
-The next index is a basic CPU IVF implementation, but no IVF code has been started. The relevant FAISS paper reading is the IVFADC discussion in **Section 2 (Problem Statement)**. The roadmap's reference to Section 3 is a section-number mismatch: Section 3 covers GPU architecture and GPU k-selection, which are outside this single-threaded CPU project's current scope.
+`IVFIndex` trains unit-normalized centroids with spherical k-means, assigns vector IDs to centroid-owned inverted lists, and probes the nearest lists at query time. It stores vectors once in a canonical contiguous array and uses the same normalized dot-product similarity as `BruteForceIndex`.
 
-The first IVF version will use k-means centroids, assign each vector to one inverted list, select the nearest `nprobe` centroids for each query, and scan only their lists using the existing exact similarity function. It will not include residual compression or product quantization; those belong to the later PQ step.
+This is a CPU-only, build-then-query index. It intentionally excludes product quantization, persistence, live inserts, updates, and retraining. The relevant FAISS reading is the IVFADC discussion in **Section 2 (Problem Statement)**; GPU-focused Section 3 remains out of scope.
 
-The chosen design for the first IVF version is documented in `DESIGN.md`; implementation remains intentionally deferred.
+Run the IVF benchmark, which reports QPS and recall@K against exact search:
+
+```powershell
+.\build\Release\ivf_benchmark.exe
+```
+
+Optional arguments are `vector_count dimensions query_count top_k nlist`:
+
+```powershell
+.\build\Release\ivf_benchmark.exe 100000 128 100 10 316
+```
 
 ## Brute-Force Baseline
 
@@ -55,6 +65,20 @@ ctest --test-dir build -C Release --output-on-failure
 
 One local Release run on 2026-08-15 completed 100 queries against 100,000 random 128-dimensional vectors with top-K 10 in 0.57 seconds: **175.63 QPS**. Throughput will vary by hardware and background load; rerun this command before comparing a future IVF or HNSW implementation.
 
+### Recorded IVF Run
+
+On 2026-08-29, the default IVF benchmark used 100,000 random 128-dimensional vectors, 100 queries, top-K 10, and `nlist = 316`. The latest run took 293.57 seconds to train centroids; that one-time training cost is separate from query QPS.
+
+| `nprobe` | QPS | recall@10 |
+| --- | ---: | ---: |
+| 1 | 9717.13 | 0.04 |
+| 4 | 3399.18 | 0.10 |
+| 8 | 1856.11 | 0.18 |
+| 16 | 927.17 | 0.27 |
+| 32 | 488.07 | 0.40 |
+
+The same run measured brute-force search at 67.17 QPS. IVF at `nprobe = 8` is about 27.6x faster, but its 0.18 recall@10 shows why QPS must always be evaluated alongside recall. The prolonged CPU-bound training step affected system performance between runs, so use these values as a reproducible sample rather than stable hardware limits.
+
 ## Project Structure
 
 ```text
@@ -62,10 +86,14 @@ VectorDB/
   src/
     brute_force_index.hpp       Reusable exact cosine-search interface
     brute_force_index.cpp       Contiguous-vector brute-force implementation
+    ivf_index.hpp               Basic CPU IVF interface and build configuration
+    ivf_index.cpp               Spherical k-means, inverted lists, and nprobe search
+    ivf_benchmark.cpp           QPS and recall@K benchmark against exact search
     main.cpp                    Benchmark command-line program
     python/                     Disposable learning exercises
   tests/
     brute_force_index_test.cpp  Exact-result correctness test
+    ivf_index_test.cpp          Full-probe equivalence and validation tests
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log
 ```
