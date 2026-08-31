@@ -62,4 +62,10 @@ Implemented and tested `IVFIndex` using the selected design: spherical k-means, 
 
 The 100,000-vector default benchmark completed with `nlist = 316` and a 293.57-second training time. At `nprobe = 8`, IVF reached 1856.11 QPS versus 67.17 QPS for exact search in the same run, a 27.6x speedup. Recall@10 was 0.18, confirming the expected speed/recall trade-off and identifying recall tuning as the next evaluation concern. The long CPU-bound training phase caused substantial timing variation, so these are reference measurements rather than stable hardware limits.
 
-Next: study and implement Product Quantization as the next Phase 4 step. Keep IVF and PQ separate initially so their individual memory, speed, and recall effects remain understandable.
+### Real-Embedding Evaluation: Complete
+
+Added a GloVe text loader and a held-out embedding benchmark. The benchmark uses the first requested vectors as the index and the following vectors as queries, reports recall@10 against `BruteForceIndex`, and reports median QPS across repeated search runs. The loader and benchmark are covered by a small parsing fixture and CTest.
+
+The GloVe-50 run indexed 100,000 vectors and used 100 held-out queries with `nlist = 316` and three repetitions. Training took 74.59 seconds. Results were materially better than the random-vector experiment: `nprobe = 8` reached 3376.47 median QPS with 0.85 recall@10; `nprobe = 16` reached 0.93 recall@10; and `nprobe = 32` reached 911.46 median QPS with 0.98 recall@10. Brute-force median QPS was 534.92.
+
+Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before moving to Product Quantization. The current evidence shows that the IVF implementation is correct and meaningful on real embeddings.

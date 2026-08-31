@@ -49,6 +49,7 @@ IVF can miss a true nearest neighbor near a cluster boundary because the relevan
 - Use `nprobe = 8` as the normal setting; benchmark `nprobe` values of 1, 4, 8, 16, and 32.
 - Support build-then-query only. Live inserts, updates, retraining, WAL integration, and persistence are deferred.
 - Use a fixed seeded synthetic dataset and query set. For each `nprobe`, report QPS and recall@10 against `BruteForceIndex`.
+- Evaluate separately on a deterministic held-out GloVe split. Report median QPS from repeated query runs and recall@10 against `BruteForceIndex`.
 
 For 100,000 vectors, the FAISS paper's rule of thumb of approximately `sqrt(N)` suggests an initial `nlist` near 316. Larger `nprobe` improves recall by examining more lists but reduces the speed benefit.
 
@@ -59,6 +60,10 @@ The FAISS paper's IVFADC explanation is in Section 2, "Problem Statement." Its S
 The exact baseline takes approximately 5.7 ms per query at 100,000 vectors and 128 dimensions (175.63 QPS). If an IVF configuration probes about 10% of balanced inverted lists, it should scan roughly 10% of the vectors after its centroid-routing step. The initial expectation is a 5-10x QPS improvement with measurable recall loss.
 
 The latest default IVF run measured 1856.11 QPS at `nprobe = 8`, compared with 67.17 QPS for exact search in that same run: about a 27.6x speedup. Recall@10 was only 0.18 on the random-vector dataset, so the result validates the speed prediction while showing that cluster pruning needs parameter tuning and realistic-data evaluation before it can be considered high quality. The full-batch training step is CPU-intensive and resulted in substantial run-to-run timing variation; training time and query QPS should be collected under controlled conditions before making absolute performance claims.
+
+The GloVe benchmark uses held-out query vectors and median QPS across repeated runs to make the next comparison more meaningful than a synthetic random-vector result.
+
+On the GloVe-50 held-out split, `nprobe = 8` reached 0.85 recall@10 at 3376.47 median QPS, while `nprobe = 32` reached 0.98 recall@10 at 911.46 median QPS. The same run measured brute force at 534.92 median QPS. This confirms that IVF benefits from meaningful embedding structure: the random-vector recall result was a dataset limitation, not an index-correctness failure.
 
 ## Storage Learning Notes
 

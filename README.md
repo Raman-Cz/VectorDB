@@ -37,6 +37,22 @@ Optional arguments are `vector_count dimensions query_count top_k nlist`:
 .\build\Release\ivf_benchmark.exe 100000 128 100 10 316
 ```
 
+## Real-Embedding Evaluation
+
+`glove_benchmark` evaluates IVF on a deterministic held-out split from a GloVe text file. The first `index_count` embeddings form the index; the following `query_count` embeddings are held out as queries. It reports every QPS sample, the median across repeated runs, and recall@K against `BruteForceIndex`.
+
+```powershell
+.\build\Release\glove_benchmark.exe data\glove.6B.50d.txt
+```
+
+Optional arguments are `dimensions index_count query_count top_k nlist repetitions`:
+
+```powershell
+.\build\Release\glove_benchmark.exe data\glove.6B.50d.txt 50 100000 100 10 316 3
+```
+
+The dataset directory is ignored by Git. Download and extract the GloVe 6B archive locally before running this command.
+
 ## Brute-Force Baseline
 
 `vector_db` creates random vectors, normalizes them on insertion, performs exact top-K cosine search, and reports query throughput. Since all indexed vectors and each query are normalized, cosine similarity is computed as a dot product.
@@ -79,6 +95,20 @@ On 2026-08-29, the default IVF benchmark used 100,000 random 128-dimensional vec
 
 The same run measured brute-force search at 67.17 QPS. IVF at `nprobe = 8` is about 27.6x faster, but its 0.18 recall@10 shows why QPS must always be evaluated alongside recall. The prolonged CPU-bound training step affected system performance between runs, so use these values as a reproducible sample rather than stable hardware limits.
 
+### Recorded GloVe Run
+
+On 2026-08-31, the held-out GloVe-50 benchmark indexed 100,000 embeddings and queried the next 100 embeddings in the file. It used `nlist = 316` and three timing repetitions per configuration; reported QPS is the median. IVF training took 74.59 seconds and brute-force median QPS was 534.92.
+
+| `nprobe` | median QPS | recall@10 |
+| --- | ---: | ---: |
+| 1 | 39019.82 | 0.48 |
+| 4 | 12068.55 | 0.75 |
+| 8 | 3376.47 | 0.85 |
+| 16 | 1291.74 | 0.93 |
+| 32 | 911.46 | 0.98 |
+
+The real embeddings make IVF's cluster routing meaningful: `nprobe = 8` provides about 6.3x the brute-force median QPS at 0.85 recall@10, while `nprobe = 32` reaches 0.98 recall@10 at about 1.7x brute-force QPS.
+
 ## Project Structure
 
 ```text
@@ -89,11 +119,14 @@ VectorDB/
     ivf_index.hpp               Basic CPU IVF interface and build configuration
     ivf_index.cpp               Spherical k-means, inverted lists, and nprobe search
     ivf_benchmark.cpp           QPS and recall@K benchmark against exact search
+    glove_loader.cpp            GloVe text-file loader
+    glove_benchmark.cpp         Held-out embedding benchmark with median QPS
     main.cpp                    Benchmark command-line program
     python/                     Disposable learning exercises
   tests/
     brute_force_index_test.cpp  Exact-result correctness test
     ivf_index_test.cpp          Full-probe equivalence and validation tests
+    glove_loader_test.cpp       GloVe parsing test using a tiny fixture
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log
 ```
