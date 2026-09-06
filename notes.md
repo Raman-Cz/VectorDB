@@ -69,3 +69,10 @@ Added a GloVe text loader and a held-out embedding benchmark. The benchmark uses
 The GloVe-50 run indexed 100,000 vectors and used 100 held-out queries with `nlist = 316` and three repetitions. Training took 74.59 seconds. Results were materially better than the random-vector experiment: `nprobe = 8` reached 3376.47 median QPS with 0.85 recall@10; `nprobe = 16` reached 0.93 recall@10; and `nprobe = 32` reached 911.46 median QPS with 0.98 recall@10. Brute-force median QPS was 534.92.
 
 Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before moving to Product Quantization. The current evidence shows that the IVF implementation is correct and meaningful on real embeddings.
+
+### Benchmark Refinement & Cluster Diagnostics: Complete
+
+- Added `IVFClusterStats` (`min_size`, `max_size`, `mean_size`, `stddev_size`, `empty_clusters`) and `getClusterStats()` to `IVFIndex` for inspecting cluster balance.
+- Fixed query selection bias in `glove_benchmark.cpp` using seeded uniform random sampling (`std::mt19937(42)`) across the held-out embedding pool.
+- Increased default query count to 500 and expanded `nprobe` sweeps to `{1, 4, 8, 10, 12, 14, 16, 32}` to pinpoint the recall curve knee.
+- Added `tests/data/tiny_glove.txt` test fixture and updated `.gitignore` scope `/data/` so test assets are tracked in Git.

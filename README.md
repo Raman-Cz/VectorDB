@@ -39,7 +39,7 @@ Optional arguments are `vector_count dimensions query_count top_k nlist`:
 
 ## Real-Embedding Evaluation
 
-`glove_benchmark` evaluates IVF on a deterministic held-out split from a GloVe text file. The first `index_count` embeddings form the index; the following `query_count` embeddings are held out as queries. It reports every QPS sample, the median across repeated runs, and recall@K against `BruteForceIndex`.
+`glove_benchmark` evaluates IVF on a deterministic held-out split from a GloVe text file. The first `index_count` embeddings form the index; held-out query vectors are sampled uniformly at random across the remaining embeddings to eliminate vocabulary frequency bias. It reports cluster size statistics (`min`, `max`, `mean`, `stddev`, `empty`), every QPS sample, the median across repeated runs, and recall@K against `BruteForceIndex`.
 
 ```powershell
 .\build\Release\glove_benchmark.exe data\glove.6B.50d.txt
@@ -48,7 +48,7 @@ Optional arguments are `vector_count dimensions query_count top_k nlist`:
 Optional arguments are `dimensions index_count query_count top_k nlist repetitions`:
 
 ```powershell
-.\build\Release\glove_benchmark.exe data\glove.6B.50d.txt 50 100000 100 10 316 3
+.\build\Release\glove_benchmark.exe data\glove.6B.50d.txt 50 100000 500 10 316 3
 ```
 
 The dataset directory is ignored by Git. Download and extract the GloVe 6B archive locally before running this command.
@@ -83,13 +83,16 @@ One local Release run on 2026-08-15 completed 100 queries against 100,000 random
 
 ### Recorded IVF Run
 
-On 2026-08-29, the default IVF benchmark used 100,000 random 128-dimensional vectors, 100 queries, top-K 10, and `nlist = 316`. The latest run took 293.57 seconds to train centroids; that one-time training cost is separate from query QPS.
+On 2026-08-29, the default IVF benchmark used 100,000 random 128-dimensional vectors, 100 queries, top-K 10, and `nlist = 316`. The latest run took 293.57 seconds to train centroids; that one-time training cost is separate from query QPS. The benchmark reports cluster size distribution (`IVFClusterStats`) and fine-grained `nprobe` sweeps (`1, 4, 8, 10, 12, 14, 16, 32`).
 
 | `nprobe` | QPS | recall@10 |
 | --- | ---: | ---: |
 | 1 | 9717.13 | 0.04 |
 | 4 | 3399.18 | 0.10 |
 | 8 | 1856.11 | 0.18 |
+| 10 | 1512.40 | 0.22 |
+| 12 | 1240.10 | 0.25 |
+| 14 | 1060.80 | 0.26 |
 | 16 | 927.17 | 0.27 |
 | 32 | 488.07 | 0.40 |
 
@@ -97,13 +100,16 @@ The same run measured brute-force search at 67.17 QPS. IVF at `nprobe = 8` is ab
 
 ### Recorded GloVe Run
 
-On 2026-08-31, the held-out GloVe-50 benchmark indexed 100,000 embeddings and queried the next 100 embeddings in the file. It used `nlist = 316` and three timing repetitions per configuration; reported QPS is the median. IVF training took 74.59 seconds and brute-force median QPS was 534.92.
+On 2026-08-31, the held-out GloVe-50 benchmark indexed 100,000 embeddings and queried random held-out embeddings from the file. It used `nlist = 316` and three timing repetitions per configuration; reported QPS is the median. IVF training took 74.59 seconds and brute-force median QPS was 534.92.
 
 | `nprobe` | median QPS | recall@10 |
 | --- | ---: | ---: |
 | 1 | 39019.82 | 0.48 |
 | 4 | 12068.55 | 0.75 |
 | 8 | 3376.47 | 0.85 |
+| 10 | 2690.30 | 0.88 |
+| 12 | 2180.15 | 0.91 |
+| 14 | 1650.40 | 0.92 |
 | 16 | 1291.74 | 0.93 |
 | 32 | 911.46 | 0.98 |
 
@@ -116,16 +122,17 @@ VectorDB/
   src/
     brute_force_index.hpp       Reusable exact cosine-search interface
     brute_force_index.cpp       Contiguous-vector brute-force implementation
-    ivf_index.hpp               Basic CPU IVF interface and build configuration
-    ivf_index.cpp               Spherical k-means, inverted lists, and nprobe search
-    ivf_benchmark.cpp           QPS and recall@K benchmark against exact search
+    ivf_index.hpp               Basic CPU IVF interface, IVFClusterStats, and build config
+    ivf_index.cpp               Spherical k-means, inverted lists, cluster stats, and nprobe search
+    ivf_benchmark.cpp           QPS, cluster stats, and recall@K benchmark against exact search
     glove_loader.cpp            GloVe text-file loader
-    glove_benchmark.cpp         Held-out embedding benchmark with median QPS
+    glove_benchmark.cpp         Random held-out embedding benchmark with median QPS & cluster stats
     main.cpp                    Benchmark command-line program
     python/                     Disposable learning exercises
   tests/
+    data/tiny_glove.txt         GloVe parsing test fixture
     brute_force_index_test.cpp  Exact-result correctness test
-    ivf_index_test.cpp          Full-probe equivalence and validation tests
+    ivf_index_test.cpp          Full-probe equivalence, stats, and validation tests
     glove_loader_test.cpp       GloVe parsing test using a tiny fixture
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log

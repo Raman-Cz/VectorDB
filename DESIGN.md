@@ -46,10 +46,10 @@ IVF can miss a true nearest neighbor near a cluster boundary because the relevan
 - Store unit-normalized data vectors and unit-normalized centroids; use dot product for centroid routing and candidate scoring.
 - Train centroids with full-batch spherical k-means using seed 42, `nlist = 316`, mean centroid movement below `1e-4`, and a 100-iteration safety cap. Empty clusters retain their prior centroid.
 - Keep one canonical contiguous vector store. Each inverted list holds only the IDs of vectors assigned to its centroid.
-- Use `nprobe = 8` as the normal setting; benchmark `nprobe` values of 1, 4, 8, 16, and 32.
+- Compute cluster size statistics (`IVFClusterStats`: min, max, mean, stddev, empty clusters) post-build to diagnose cluster balance quality.
+- Benchmark fine-grained `nprobe` values `{1, 4, 8, 10, 12, 14, 16, 32}` to capture the knee of the recall-vs-speed curve.
 - Support build-then-query only. Live inserts, updates, retraining, WAL integration, and persistence are deferred.
-- Use a fixed seeded synthetic dataset and query set. For each `nprobe`, report QPS and recall@10 against `BruteForceIndex`.
-- Evaluate separately on a deterministic held-out GloVe split. Report median QPS from repeated query runs and recall@10 against `BruteForceIndex`.
+- Sample held-out query vectors uniformly at random from the embedding file using seeded PRNG (`std::mt19937(42)`) to eliminate vocabulary frequency bias. Report median QPS across repeated runs and recall@10 against `BruteForceIndex`.
 
 For 100,000 vectors, the FAISS paper's rule of thumb of approximately `sqrt(N)` suggests an initial `nlist` near 316. Larger `nprobe` improves recall by examining more lists but reduces the speed benefit.
 
