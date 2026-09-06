@@ -83,37 +83,39 @@ One local Release run on 2026-08-15 completed 100 queries against 100,000 random
 
 ### Recorded IVF Run
 
-On 2026-08-29, the default IVF benchmark used 100,000 random 128-dimensional vectors, 100 queries, top-K 10, and `nlist = 316`. The latest run took 293.57 seconds to train centroids; that one-time training cost is separate from query QPS. The benchmark reports cluster size distribution (`IVFClusterStats`) and fine-grained `nprobe` sweeps (`1, 4, 8, 10, 12, 14, 16, 32`).
+On 2026-09-06, the default synthetic IVF benchmark used 100,000 random 128-dimensional vectors, 100 queries, top-K 10, and `nlist = 316`. Centroid training took 305.45 seconds. Cluster sizes were nearly uniform across centroids (`min: 271, max: 359, mean: 316.46, stddev: 14.48, empty: 0`).
 
 | `nprobe` | QPS | recall@10 |
 | --- | ---: | ---: |
-| 1 | 9717.13 | 0.04 |
-| 4 | 3399.18 | 0.10 |
-| 8 | 1856.11 | 0.18 |
-| 10 | 1512.40 | 0.22 |
-| 12 | 1240.10 | 0.25 |
-| 14 | 1060.80 | 0.26 |
-| 16 | 927.17 | 0.27 |
-| 32 | 488.07 | 0.40 |
+| 1 | 6380.52 | 0.04 |
+| 4 | 1955.88 | 0.10 |
+| 8 | 1106.99 | 0.18 |
+| 10 | 933.12 | 0.21 |
+| 12 | 725.12 | 0.23 |
+| 14 | 795.50 | 0.26 |
+| 16 | 721.24 | 0.27 |
+| 32 | 341.27 | 0.40 |
 
-The same run measured brute-force search at 67.17 QPS. IVF at `nprobe = 8` is about 27.6x faster, but its 0.18 recall@10 shows why QPS must always be evaluated alongside recall. The prolonged CPU-bound training step affected system performance between runs, so use these values as a reproducible sample rather than stable hardware limits.
+The same run measured brute-force search at 52.49 QPS. IVF at `nprobe = 8` is about 21.1x faster, but its 0.18 recall@10 shows why synthetic random vectors produce poor cluster partitioning compared to real embeddings.
 
 ### Recorded GloVe Run
 
-On 2026-08-31, the held-out GloVe-50 benchmark indexed 100,000 embeddings and queried random held-out embeddings from the file. It used `nlist = 316` and three timing repetitions per configuration; reported QPS is the median. IVF training took 74.59 seconds and brute-force median QPS was 534.92.
+On 2026-09-06, the GloVe-50 benchmark indexed 100,000 embeddings and evaluated 500 held-out query vectors sampled uniformly at random across the vocabulary pool. It used `nlist = 316` and three timing repetitions per configuration; reported QPS is the median. Centroid training took 85.97 seconds and brute-force median QPS was 246.36.
+
+Cluster sizes reflected true real-world embedding skew (`min: 72, max: 934, mean: 316.46, stddev: 101.09, empty: 0`).
 
 | `nprobe` | median QPS | recall@10 |
 | --- | ---: | ---: |
-| 1 | 39019.82 | 0.48 |
-| 4 | 12068.55 | 0.75 |
-| 8 | 3376.47 | 0.85 |
-| 10 | 2690.30 | 0.88 |
-| 12 | 2180.15 | 0.91 |
-| 14 | 1650.40 | 0.92 |
-| 16 | 1291.74 | 0.93 |
-| 32 | 911.46 | 0.98 |
+| 1 | 19204.92 | 0.45 |
+| 4 | 5454.62 | 0.73 |
+| 8 | 2755.74 | 0.84 |
+| 10 | 2328.27 | 0.87 |
+| 12 | 1907.47 | 0.89 |
+| 14 | 1682.95 | 0.91 |
+| 16 | 1430.88 | 0.92 |
+| 32 | 718.73 | 0.97 |
 
-The real embeddings make IVF's cluster routing meaningful: `nprobe = 8` provides about 6.3x the brute-force median QPS at 0.85 recall@10, while `nprobe = 32` reaches 0.98 recall@10 at about 1.7x brute-force QPS.
+Real semantic embeddings give IVF meaningful cluster routing: `nprobe = 8` provides about 11.2x brute-force throughput at 0.84 recall@10; `nprobe = 14` reaches 0.91 recall@10 at 6.8x brute-force speed; and `nprobe = 32` achieves 0.97 recall@10.
 
 ## Project Structure
 

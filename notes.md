@@ -73,6 +73,7 @@ Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before m
 ### Benchmark Refinement & Cluster Diagnostics: Complete
 
 - Added `IVFClusterStats` (`min_size`, `max_size`, `mean_size`, `stddev_size`, `empty_clusters`) and `getClusterStats()` to `IVFIndex` for inspecting cluster balance.
-- Fixed query selection bias in `glove_benchmark.cpp` using seeded uniform random sampling (`std::mt19937(42)`) across the held-out embedding pool.
-- Increased default query count to 500 and expanded `nprobe` sweeps to `{1, 4, 8, 10, 12, 14, 16, 32}` to pinpoint the recall curve knee.
+- Fixed query selection bias in `glove_benchmark.cpp` using seeded uniform random sampling (`std::mt19937(42)`) across 500 held-out query embeddings.
+- Expanded `nprobe` sweeps to `{1, 4, 8, 10, 12, 14, 16, 32}`. Recorded GloVe results: `nprobe=8` (0.84 recall@10 at 2755 QPS), `nprobe=14` (0.91 recall@10 at 1682 QPS), and `nprobe=32` (0.97 recall@10 at 718 QPS).
+- Recorded cluster size distribution on real GloVe data showing natural cluster skew (`min: 72, max: 934, stddev: 101.09`) versus synthetic uniform data (`min: 271, max: 359, stddev: 14.48`).
 - Added `tests/data/tiny_glove.txt` test fixture and updated `.gitignore` scope `/data/` so test assets are tracked in Git.

@@ -59,11 +59,11 @@ The FAISS paper's IVFADC explanation is in Section 2, "Problem Statement." Its S
 
 The exact baseline takes approximately 5.7 ms per query at 100,000 vectors and 128 dimensions (175.63 QPS). If an IVF configuration probes about 10% of balanced inverted lists, it should scan roughly 10% of the vectors after its centroid-routing step. The initial expectation is a 5-10x QPS improvement with measurable recall loss.
 
-The latest default IVF run measured 1856.11 QPS at `nprobe = 8`, compared with 67.17 QPS for exact search in that same run: about a 27.6x speedup. Recall@10 was only 0.18 on the random-vector dataset, so the result validates the speed prediction while showing that cluster pruning needs parameter tuning and realistic-data evaluation before it can be considered high quality. The full-batch training step is CPU-intensive and resulted in substantial run-to-run timing variation; training time and query QPS should be collected under controlled conditions before making absolute performance claims.
+The synthetic IVF run measured 1106.99 QPS at `nprobe = 8`, compared with 52.49 QPS for exact search in that same run: about a 21.1x speedup. Recall@10 was 0.18 on the random-vector dataset. Cluster sizes were uniform (`min: 271, max: 359, stddev: 14.48`). This confirms that random uniform vectors do not form natural semantic clusters.
 
-The GloVe benchmark uses held-out query vectors and median QPS across repeated runs to make the next comparison more meaningful than a synthetic random-vector result.
+On the GloVe-50 held-out split (500 random held-out queries), `nprobe = 8` reached 0.84 recall@10 at 2755.74 median QPS, `nprobe = 14` reached 0.91 recall@10 at 1682.95 median QPS, and `nprobe = 32` reached 0.97 recall@10 at 718.73 median QPS. The same run measured brute force at 246.36 median QPS.
 
-On the GloVe-50 held-out split, `nprobe = 8` reached 0.85 recall@10 at 3376.47 median QPS, while `nprobe = 32` reached 0.98 recall@10 at 911.46 median QPS. The same run measured brute force at 534.92 median QPS. This confirms that IVF benefits from meaningful embedding structure: the random-vector recall result was a dataset limitation, not an index-correctness failure.
+Real embedding clusters showed significant size variance (`min: 72, max: 934, stddev: 101.09`), demonstrating that semantic embeddings produce dense and sparse vector spaces that benefit from cluster routing.
 
 ## Storage Learning Notes
 
