@@ -65,13 +65,13 @@ On the GloVe-50 held-out split (500 random held-out queries), `nprobe = 8` reach
 
 Real embedding clusters showed significant size variance (`min: 72, max: 934, stddev: 101.09`), demonstrating that semantic embeddings produce dense and sparse vector spaces that benefit from cluster routing.
 
-### `nlist` Parameter Sweep Trade-offs
+### `nlist` Parameter Sweep Analysis & Effective Search Fraction
 
-Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings confirms the fundamental cluster-granularity trade-off:
+Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings highlights the joint mechanics of cluster granularity ($N_{list}$) and probing depth ($N_{probe}$):
 
-- **Fewer Clusters ($N_{list}=100$)**: Larger inverted lists (mean size $\approx 1000$). Probing 8 clusters scans $8\%$ of the dataset, achieving high recall (0.91 at `nprobe=8`) but at lower QPS (1,796).
-- **More Clusters ($N_{list}=2000$)**: Smaller inverted lists (mean size $\approx 50$). Probing 8 clusters scans only $0.4\%$ of the dataset, achieving high throughput (8,595 QPS) but lower recall (0.70) due to nearest neighbors spilling into unprobed clusters.
-- **Golden Mean ($N_{list}=316 \approx \sqrt{N}$)**: Provides the optimal balance between centroid routing precision, list scan overhead, and fast build time (86s vs 226s for $N_{list}=2000$).
+- **Effective Search Fraction**: Recall is primarily governed by the fraction of the dataset searched ($\frac{N_{probe}}{N_{list}}$). At fixed $N_{probe}=8$, $N_{list}=100$ searches $8\%$ of the dataset (achieving $0.91$ recall), while $N_{list}=2000$ searches only $0.4\%$ of the dataset (achieving $0.70$ recall).
+- **Target Recall Efficiency**: When holding target recall constant, higher $N_{list}$ with smaller clusters yields superior QPS. For example, at $N_{list}=2000, N_{probe}=32$ ($\text{fraction} = 1.6\%$), the index achieves **0.89 recall@10** at **3,521 QPS**, outperforming $N_{list}=316, N_{probe}=8$ ($\text{fraction} = 2.5\%$) which achieves **0.84 recall@10** at **2,755 QPS**.
+- **Practical Balance ($\sqrt{N} \approx 316$)**: While higher $N_{list}$ increases QPS efficiency at equal recall, it increases centroid routing overhead and training time ($226$s vs $86$s). $\sqrt{N} \approx 316$ represents a pragmatic engineering baseline balancing training speed, memory footprint, and query performance.
 
 ## Storage Learning Notes
 
