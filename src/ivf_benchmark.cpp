@@ -102,15 +102,22 @@ int main(int argc, char* argv[]) {
         }
         const std::chrono::duration<double> exact_elapsed = std::chrono::steady_clock::now() - exact_start;
 
+        const vectordb::IVFClusterStats cluster_stats = ivf_index.getClusterStats();
+
         std::cout << std::fixed << std::setprecision(2)
                   << "IVF cosine benchmark\n"
                   << "vectors: " << vector_count << ", dimensions: " << dimensions
                   << ", queries: " << query_count << ", top_k: " << top_k << ", nlist: " << nlist << '\n'
                   << "IVF build time: " << build_elapsed.count() << " s\n"
+                  << "Cluster sizes -> min: " << cluster_stats.min_size
+                  << ", max: " << cluster_stats.max_size
+                  << ", mean: " << cluster_stats.mean_size
+                  << ", stddev: " << cluster_stats.stddev_size
+                  << ", empty: " << cluster_stats.empty_clusters << '\n'
                   << "Brute-force QPS: " << static_cast<double>(query_count) / exact_elapsed.count() << "\n\n"
                   << "nprobe  QPS       recall@" << top_k << '\n';
 
-        constexpr std::array<std::size_t, 5> probe_values{1, 4, 8, 16, 32};
+        constexpr std::array<std::size_t, 8> probe_values{1, 4, 8, 10, 12, 14, 16, 32};
         for (const std::size_t nprobe : probe_values) {
             if (nprobe > nlist) {
                 continue;

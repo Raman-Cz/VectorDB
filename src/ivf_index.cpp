@@ -245,6 +245,42 @@ std::vector<SearchResult> IVFIndex::search(
     return sorted_results;
 }
 
+IVFClusterStats IVFIndex::getClusterStats() const {
+    if (!isBuilt()) {
+        throw std::logic_error("The IVF index must be built before computing cluster stats.");
+    }
+
+    IVFClusterStats stats;
+    stats.min_size = inverted_lists_.front().size();
+    stats.max_size = inverted_lists_.front().size();
+    double sum = 0.0;
+
+    for (const auto& list : inverted_lists_) {
+        const std::size_t sz = list.size();
+        if (sz < stats.min_size) {
+            stats.min_size = sz;
+        }
+        if (sz > stats.max_size) {
+            stats.max_size = sz;
+        }
+        if (sz == 0) {
+            ++stats.empty_clusters;
+        }
+        sum += static_cast<double>(sz);
+    }
+
+    stats.mean_size = sum / static_cast<double>(nlist_);
+
+    double variance_sum = 0.0;
+    for (const auto& list : inverted_lists_) {
+        const double diff = static_cast<double>(list.size()) - stats.mean_size;
+        variance_sum += diff * diff;
+    }
+    stats.stddev_size = std::sqrt(variance_sum / static_cast<double>(nlist_));
+
+    return stats;
+}
+
 std::size_t IVFIndex::dimensions() const {
     return dimensions_;
 }

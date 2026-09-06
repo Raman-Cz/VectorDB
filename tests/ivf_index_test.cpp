@@ -79,10 +79,24 @@ void testValidation() {
     assert(rejected_zero_probe_count);
 }
 
+void testClusterStats() {
+    const std::vector<float> dataset{
+        1.0F, 0.0F,
+        0.0F, 1.0F,
+        -1.0F, 0.0F,
+        0.0F, -1.0F};
+    vectordb::IVFIndex index(2, 2);
+    index.build(dataset);
+    const vectordb::IVFClusterStats stats = index.getClusterStats();
+    assert(stats.min_size + stats.max_size == 4 || stats.mean_size == 2.0);
+    assert(stats.mean_size == 2.0);
+}
+
 }  // namespace
 
 int main() {
     testFullProbeMatchesBruteForce();
     testValidation();
+    testClusterStats();
     return 0;
 }

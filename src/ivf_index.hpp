@@ -14,6 +14,14 @@ struct IVFBuildConfig {
     float centroid_tolerance = 1e-4F;
 };
 
+struct IVFClusterStats {
+    std::size_t min_size = 0;
+    std::size_t max_size = 0;
+    double mean_size = 0.0;
+    double stddev_size = 0.0;
+    std::size_t empty_clusters = 0;
+};
+
 class IVFIndex {
 public:
     IVFIndex(std::size_t dimensions, std::size_t nlist, IVFBuildConfig config = {});
@@ -26,6 +34,8 @@ public:
         const std::vector<float>& query,
         std::size_t top_k,
         std::size_t nprobe = 8) const;
+
+    IVFClusterStats getClusterStats() const;
 
     std::size_t dimensions() const;
     std::size_t size() const;
