@@ -65,6 +65,14 @@ On the GloVe-50 held-out split (500 random held-out queries), `nprobe = 8` reach
 
 Real embedding clusters showed significant size variance (`min: 72, max: 934, stddev: 101.09`), demonstrating that semantic embeddings produce dense and sparse vector spaces that benefit from cluster routing.
 
+### `nlist` Parameter Sweep Trade-offs
+
+Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings confirms the fundamental cluster-granularity trade-off:
+
+- **Fewer Clusters ($N_{list}=100$)**: Larger inverted lists (mean size $\approx 1000$). Probing 8 clusters scans $8\%$ of the dataset, achieving high recall (0.91 at `nprobe=8`) but at lower QPS (1,796).
+- **More Clusters ($N_{list}=2000$)**: Smaller inverted lists (mean size $\approx 50$). Probing 8 clusters scans only $0.4\%$ of the dataset, achieving high throughput (8,595 QPS) but lower recall (0.70) due to nearest neighbors spilling into unprobed clusters.
+- **Golden Mean ($N_{list}=316 \approx \sqrt{N}$)**: Provides the optimal balance between centroid routing precision, list scan overhead, and fast build time (86s vs 226s for $N_{list}=2000$).
+
 ## Storage Learning Notes
 
 LSM trees favor write-heavy workloads through append-only segments and compaction. B+ trees favor point lookups and range scans through balanced in-place structure. The WAL exercise demonstrates that replaying complete append-only records can restore state after an interrupted write.

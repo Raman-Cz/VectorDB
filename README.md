@@ -117,6 +117,17 @@ Cluster sizes reflected true real-world embedding skew (`min: 72, max: 934, mean
 
 Real semantic embeddings give IVF meaningful cluster routing: `nprobe = 8` provides about 11.2x brute-force throughput at 0.84 recall@10; `nprobe = 14` reaches 0.91 recall@10 at 6.8x brute-force speed; and `nprobe = 32` achieves 0.97 recall@10.
 
+### Coarse Cluster Sweep (`nlist`) Comparison
+
+Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on GloVe-50 demonstrates the trade-off between cluster size, search throughput, and recall@10:
+
+| `nlist` | Build Time | Cluster Mean Size | Cluster StdDev | `nprobe=8` QPS | `nprobe=8` Recall | `nprobe=14` QPS | `nprobe=14` Recall | `nprobe=32` QPS | `nprobe=32` Recall |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **100** | 15.18s | 1000.0 | 278.8 | 1795.97 | 0.91 | 893.58 | 0.96 | 401.16 | 0.99 |
+| **316** ($\approx \sqrt{N}$) | 85.97s | 316.5 | 101.1 | 2755.74 | 0.84 | 1682.95 | 0.91 | 718.73 | 0.97 |
+| **1000** | 171.31s | 100.0 | 38.7 | 7623.52 | 0.74 | 5241.04 | 0.83 | 2657.79 | 0.92 |
+| **2000** | 225.78s | 50.0 | 21.7 | 8595.14 | 0.70 | 6346.38 | 0.78 | 3521.20 | 0.89 |
+
 ## Project Structure
 
 ```text
