@@ -78,3 +78,11 @@ Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before m
 - Recorded cluster size distribution on real GloVe data showing natural cluster skew (`min: 72, max: 934, stddev: 101.09`) versus synthetic uniform data (`min: 271, max: 359, stddev: 14.48`).
 - Completed `nlist` parameter sweep across $\{100, 316, 1000, 2000\}$: demonstrated that recall is governed by the effective search fraction ($\frac{N_{probe}}{N_{list}}$). At matched recall targets, higher $N_{list}$ yields superior QPS (e.g. $N_{list}=2000, N_{probe}=32$ yields 3521 QPS at 0.89 recall vs $N_{list}=316, N_{probe}=8$ yielding 2755 QPS at 0.84 recall), while $\sqrt{N} \approx 316$ remains a practical build-time default.
 - Added `tests/data/tiny_glove.txt` test fixture and updated `.gitignore` scope `/data/` so test assets are tracked in Git.
+
+### Product Quantization (PQ): Complete
+
+- Implemented `ProductQuantizer` and `PQIndex` for lossy vector compression and fast Asymmetric Distance Computation (ADC).
+- Quantizes $D$-dimensional vectors by partitioning into $M$ sub-vectors and learning $K^*=256$ centroids per sub-space, encoding each vector into $M$ bytes.
+- Pre-computes 2D distance lookup tables ($M \times 256$) per query, enabling candidate distance evaluation via fast $M$-byte lookups and additions.
+- Measured $40\times$ memory footprint reduction ($200$ bytes $\rightarrow$ $5$ bytes at $M=5$) achieving **2,746 QPS** on 100k GloVe-50 embeddings. At $M=25$ (8x compression), recall@10 reached **0.61** with **985 QPS**.
+- Added unit test suite `product_quantizer_test` covering sub-vector partitioning, codebook training, 1-byte encoding/decoding, and ADC lookup accuracy. All CTest unit tests passed.

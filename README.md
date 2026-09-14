@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. Steps 1-3 are complete: the exact brute-force baseline, failed-approach study, and basic CPU IVF implementation are complete and benchmarked.
+Phase 4 (ANN Algorithms) is in progress. Steps 1-4 are complete: the exact brute-force baseline, failed-approach study, basic CPU IVF implementation, and Product Quantization (PQ) vector compression are complete and benchmarked.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Phase 4 (ANN Algorithms) is in progress. Steps 1-3 are complete: the exact brute
 | 1 | Information-retrieval foundations | Done |
 | 2 | Linear algebra: dot product, normalization, dimensionality | Done |
 | 3 | Storage internals and WAL learning exercise | Done |
-| 4 | ANN algorithms: baseline, IVF, PQ, HNSW | In progress |
+| 4 | ANN algorithms: baseline, IVF, PQ, HNSW | In progress (PQ complete) |
 | 5 | Read FAISS source | Planned |
 | 6 | Memory and cache performance model | Planned |
 | 7 | Build the persistent vector database | Planned |
@@ -128,6 +128,26 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on GloVe-50 demonstrates the tr
 | **1000** | 171.31s | 100.0 | 38.7 | 7623.52 | 0.74 | 5241.04 | 0.83 | 2657.79 | 0.92 |
 | **2000** | 225.78s | 50.0 | 21.7 | 8595.14 | 0.70 | 6346.38 | 0.78 | 3521.20 | 0.89 |
 
+## Product Quantization (PQ) Vector Compression
+
+`ProductQuantizer` and `PQIndex` implement lossy vector compression by partitioning $D$-dimensional vectors into $M$ sub-vectors and quantizing each sub-space independently into $K^*=256$ centroids. Each vector is stored as $M$ bytes (1 byte per sub-space codebook index), and queries run fast **Asymmetric Distance Computation (ADC)** via pre-computed lookup tables.
+
+```powershell
+.\build\Release\pq_benchmark.exe data\glove.6B.50d.txt
+```
+
+### Recorded PQ Run
+
+On 2026-09-14, `pq_benchmark` evaluated 100,000 GloVe-50 vectors (uncompressed size 200 bytes per vector) across 500 randomly sampled held-out queries. Brute-force median QPS was 480.07.
+
+| $M$ (Sub-vectors) | Bytes/Vector | Compression | Train Time | median QPS | recall@10 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| **5** | 5 bytes | **40.00x** | 23.06s | 2745.85 | 0.24 |
+| **10** | 10 bytes | **20.00x** | 31.17s | 2158.53 | 0.44 |
+| **25** | 25 bytes | **8.00x** | 69.10s | 984.91 | 0.61 |
+
+At $M=5$, PQ achieves a **40x memory compression ratio** (shrinking 200-byte vectors to 5 bytes) and 2,746 QPS. As $M$ increases to 25, recall@10 rises to 0.61.
+
 ## Project Structure
 
 ```text
@@ -138,6 +158,11 @@ VectorDB/
     ivf_index.hpp               Basic CPU IVF interface, IVFClusterStats, and build config
     ivf_index.cpp               Spherical k-means, inverted lists, cluster stats, and nprobe search
     ivf_benchmark.cpp           QPS, cluster stats, and recall@K benchmark against exact search
+    product_quantizer.hpp       Sub-vector partitioning, K-means codebooks & ADC tables
+    product_quantizer.cpp       Codebook training, 1-byte encoding/decoding, ADC distance lookups
+    pq_index.hpp                Compressed in-memory index storing M bytes per vector
+    pq_index.cpp                PQ compressed search using pre-computed ADC lookup tables
+    pq_benchmark.cpp             Memory footprint, QPS, and recall@10 benchmark harness
     glove_loader.cpp            GloVe text-file loader
     glove_benchmark.cpp         Random held-out embedding benchmark with median QPS & cluster stats
     main.cpp                    Benchmark command-line program
@@ -147,6 +172,7 @@ VectorDB/
     brute_force_index_test.cpp  Exact-result correctness test
     ivf_index_test.cpp          Full-probe equivalence, stats, and validation tests
     glove_loader_test.cpp       GloVe parsing test using a tiny fixture
+    product_quantizer_test.cpp  Sub-vector partitioning, encoding/decoding, and ADC tests
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log
 ```

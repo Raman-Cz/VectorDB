@@ -73,6 +73,15 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings hig
 - **Target Recall Efficiency**: When holding target recall constant, higher $N_{list}$ with smaller clusters yields superior QPS. For example, at $N_{list}=2000, N_{probe}=32$ ($\text{fraction} = 1.6\%$), the index achieves **0.89 recall@10** at **3,521 QPS**, outperforming $N_{list}=316, N_{probe}=8$ ($\text{fraction} = 2.5\%$) which achieves **0.84 recall@10** at **2,755 QPS**.
 - **Practical Balance ($\sqrt{N} \approx 316$)**: While higher $N_{list}$ increases QPS efficiency at equal recall, it increases centroid routing overhead and training time ($226$s vs $86$s). $\sqrt{N} \approx 316$ represents a pragmatic engineering baseline balancing training speed, memory footprint, and query performance.
 
+### Product Quantization (PQ): Implemented
+
+`ProductQuantizer` and `PQIndex` implement lossy vector compression to address vector storage memory bottlenecks.
+
+- **Sub-Vector Division**: $D$-dimensional vectors are split into $M$ sub-vectors of dimension $D_{sub} = D / M$.
+- **Sub-Space Codebooks**: Independent K-Means models learn $K^* = 256$ centroids per sub-space.
+- **Compact Byte Encoding**: Each vector is compressed into $M$ bytes (1 byte per sub-space codebook index), achieving up to $40\times$ memory reduction ($200$ bytes $\rightarrow$ $5$ bytes for 50D vectors at $M=5$).
+- **Asymmetric Distance Computation (ADC)**: Pre-computes a 2D distance lookup table ($M \times 256$ floats) per query, enabling fast approximate distance calculations via $M$ byte lookups and additions per candidate vector.
+
 ## Storage Learning Notes
 
 LSM trees favor write-heavy workloads through append-only segments and compaction. B+ trees favor point lookups and range scans through balanced in-place structure. The WAL exercise demonstrates that replaying complete append-only records can restore state after an interrupted write.
