@@ -18,19 +18,20 @@ void testProductQuantizerBasic() {
     assert(pq.num_centroids() == 2);
     assert(!pq.isTrained());
 
-    // Training dataset: 4 vectors of 4D
+    // Training dataset: 4 unit-normalized 4D vectors (L2 norm = 1.0)
+    const float s = 1.0F / std::sqrt(2.0F); // ~0.7071
     const std::vector<float> dataset{
-        1.0F, 0.0F,  0.0F, 1.0F,
-        1.1F, 0.1F,  0.1F, 0.9F,
-        -1.0F, 0.0F, 0.0F, -1.0F,
-        -0.9F, 0.1F, -0.1F, -0.9F
+         s,  0.0F,  0.0F,  s,
+         0.8F, 0.0F, 0.0F, 0.6F, // 0.8^2 + 0.6^2 = 1.0
+        -s,  0.0F,  0.0F, -s,
+        -0.8F, 0.0F, 0.0F, -0.6F
     };
 
     pq.train(dataset);
     assert(pq.isTrained());
 
-    // Encode a vector
-    const std::vector<float> vec{1.05F, 0.05F, 0.05F, 0.95F};
+    // Encode a unit-normalized query vector
+    const std::vector<float> vec{s, 0.0F, 0.0F, s};
     const std::vector<std::uint8_t> codes = pq.encode(vec.data());
     assert(codes.size() == 2);
 
