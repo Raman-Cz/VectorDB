@@ -84,5 +84,10 @@ Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before m
 - Implemented `ProductQuantizer` and `PQIndex` for lossy vector compression and fast Asymmetric Distance Computation (ADC).
 - Quantizes $D$-dimensional vectors by partitioning into $M$ sub-vectors and learning $K^*=256$ centroids per sub-space, encoding each vector into $M$ bytes.
 - Pre-computes 2D distance lookup tables ($M \times 256$) per query, enabling candidate distance evaluation via fast $M$-byte lookups and additions.
-- Measured $40\times$ memory footprint reduction ($200$ bytes $\rightarrow$ $5$ bytes at $M=5$) achieving **2,746 QPS** on 100k GloVe-50 embeddings. At $M=25$ (8x compression), recall@10 reached **0.61** with **985 QPS**.
+- Discovered and resolved a critical metric mismatch bug: `BruteForceIndex` ranks by cosine similarity while `ProductQuantizer` uses squared Euclidean distance. Resolved by enforcing $L_2=1.0$ unit normalization in `PQIndex` before quantizer training, encoding, and query table construction. Since $\|u-v\|^2 = 2 - 2(u \cdot v)$ for unit vectors, ADC distance rankings became strictly monotonic with exact cosine ground truth.
+- Benchmark on 100k GloVe-50 embeddings across 500 random held-out queries confirmed:
+  - $M=5$ ($40\times$ compression, 5 bytes/vec): **2,919 median QPS**, recall@10 = **0.26**.
+  - $M=10$ ($20\times$ compression, 10 bytes/vec): **1,915 median QPS**, recall@10 = **0.52**.
+  - $M=25$ ($8\times$ compression, 25 bytes/vec): **1,076 median QPS**, recall@10 = **0.87** (increased from 0.61 pre-normalization).
 - Added unit test suite `product_quantizer_test` covering sub-vector partitioning, codebook training, 1-byte encoding/decoding, and ADC lookup accuracy. All CTest unit tests passed.
+

@@ -138,15 +138,15 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on GloVe-50 demonstrates the tr
 
 ### Recorded PQ Run
 
-On 2026-09-14, `pq_benchmark` evaluated 100,000 GloVe-50 vectors (uncompressed size 200 bytes per vector) across 500 randomly sampled held-out queries. Brute-force median QPS was 480.07.
+On 2026-09-14, `pq_benchmark` evaluated 100,000 GloVe-50 vectors (uncompressed size 200 bytes per vector) across 500 randomly sampled held-out queries. All vectors are unit-normalized ($L_2 = 1.0$) to align squared Euclidean ADC distance with exact cosine ranking. Brute-force median QPS was 517.89.
 
 | $M$ (Sub-vectors) | Bytes/Vector | Compression | Train Time | median QPS | recall@10 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| **5** | 5 bytes | **40.00x** | 23.06s | 2745.85 | 0.24 |
-| **10** | 10 bytes | **20.00x** | 31.17s | 2158.53 | 0.44 |
-| **25** | 25 bytes | **8.00x** | 69.10s | 984.91 | 0.61 |
+| **5** | 5 bytes | **40.00x** | 22.73s | 2919.31 | 0.26 |
+| **10** | 10 bytes | **20.00x** | 31.44s | 1915.56 | 0.52 |
+| **25** | 25 bytes | **8.00x** | 49.06s | 1076.18 | **0.87** |
 
-At $M=5$, PQ achieves a **40x memory compression ratio** (shrinking 200-byte vectors to 5 bytes) and 2,746 QPS. As $M$ increases to 25, recall@10 rises to 0.61.
+At $M=5$, PQ achieves a **40x memory compression ratio** (shrinking 200-byte vectors to 5 bytes) and 2,919 QPS. At $M=25$ (8x compression), recall@10 reaches **0.87** with 1,076 QPS.
 
 ## Project Structure
 

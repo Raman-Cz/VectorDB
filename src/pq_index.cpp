@@ -1,11 +1,26 @@
 #include "pq_index.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <queue>
 #include <stdexcept>
 
 namespace vectordb {
 namespace {
+
+void normalize(float* vector, const std::size_t dimensions) {
+    float squared_norm = 0.0F;
+    for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
+        squared_norm += vector[dimension] * vector[dimension];
+    }
+    if (squared_norm == 0.0F) {
+        return;
+    }
+    const float inverse_norm = 1.0F / std::sqrt(squared_norm);
+    for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
+        vector[dimension] *= inverse_norm;
+    }
+}
 
 // For Euclidean / ADC distance, LOWER score means closer neighbor (better result)
 struct LowerDistanceScore {
@@ -37,12 +52,17 @@ void PQIndex::trainAndBuild(const std::vector<float>& vectors, const std::size_t
         throw std::invalid_argument("Vectors must contain complete, non-empty records.");
     }
 
-    quantizer_.train(vectors, max_iterations);
     vector_count_ = vectors.size() / dimensions_;
+    std::vector<float> normalized_vectors = vectors;
+    for (std::size_t i = 0; i < vector_count_; ++i) {
+        normalize(normalized_vectors.data() + (i * dimensions_), dimensions_);
+    }
+
+    quantizer_.train(normalized_vectors, max_iterations);
 
     codes_.resize(vector_count_ * num_sub_vectors_);
     for (std::size_t i = 0; i < vector_count_; ++i) {
-        const float* vec_ptr = vectors.data() + (i * dimensions_);
+        const float* vec_ptr = normalized_vectors.data() + (i * dimensions_);
         const std::vector<std::uint8_t> code = quantizer_.encode(vec_ptr);
         std::copy(code.begin(), code.end(), codes_.data() + (i * num_sub_vectors_));
     }
@@ -63,8 +83,11 @@ std::vector<SearchResult> PQIndex::search(
 
     const std::size_t result_count = std::min(top_k, vector_count_);
 
+    std::vector<float> normalized_query = query;
+    normalize(normalized_query.data(), dimensions_);
+
     // Compute distance lookup table once per query (M x num_centroids)
-    const std::vector<float> distance_table = quantizer_.computeDistanceTable(query.data());
+    const std::vector<float> distance_table = quantizer_.computeDistanceTable(normalized_query.data());
 
     // Max-heap to track top_k smallest distances
     std::priority_queue<SearchResult, std::vector<SearchResult>, LowerDistanceScore> results;

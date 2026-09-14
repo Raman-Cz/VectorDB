@@ -81,6 +81,8 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings hig
 - **Sub-Space Codebooks**: Independent K-Means models learn $K^* = 256$ centroids per sub-space.
 - **Compact Byte Encoding**: Each vector is compressed into $M$ bytes (1 byte per sub-space codebook index), achieving up to $40\times$ memory reduction ($200$ bytes $\rightarrow$ $5$ bytes for 50D vectors at $M=5$).
 - **Asymmetric Distance Computation (ADC)**: Pre-computes a 2D distance lookup table ($M \times 256$ floats) per query, enabling fast approximate distance calculations via $M$ byte lookups and additions per candidate vector.
+- **Metric Normalization Alignment**: To ensure compatibility with exact cosine ground truth, `PQIndex` enforces $L_2 = 1.0$ unit normalization prior to quantizer training, encoding, and query table computation. For unit-normalized vectors ($\|u\| = \|v\| = 1.0$), squared Euclidean distance $\|u-v\|^2 = 2 - 2(u \cdot v)$ is strictly monotonic with cosine similarity. Aligning the metrics increased $M=25$ recall@10 from 0.61 (unnormalized metric mismatch) to **0.87** at **1,076 median QPS** ($8\times$ compression). At $M=5$ ($40\times$ compression), recall@10 is **0.26** at **2,919 median QPS**.
+
 
 ## Storage Learning Notes
 
