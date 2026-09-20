@@ -83,6 +83,20 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings hig
 - **Asymmetric Distance Computation (ADC)**: Pre-computes a 2D distance lookup table ($M \times 256$ floats) per query, enabling fast approximate distance calculations via $M$ byte lookups and additions per candidate vector.
 - **Metric Normalization Alignment**: To ensure compatibility with exact cosine ground truth, `PQIndex` enforces $L_2 = 1.0$ unit normalization prior to quantizer training, encoding, and query table computation. For unit-normalized vectors ($\|u\| = \|v\| = 1.0$), squared Euclidean distance $\|u-v\|^2 = 2 - 2(u \cdot v)$ is strictly monotonic with cosine similarity. Aligning the metrics increased $M=25$ recall@10 from 0.61 (unnormalized metric mismatch) to **0.87** at **1,076 median QPS** ($8\times$ compression). At $M=5$ ($40\times$ compression), recall@10 is **0.26** at **2,919 median QPS**.
 
+### Inverted File with Product Quantization (IVFPQ): Implemented
+
+`IVFPQIndex` combines coarse cluster pruning (IVF) with vector compression (PQ) to achieve high search throughput alongside low memory footprint.
+
+- **Residual Product Quantization**: Rather than quantizing raw vectors, `IVFPQIndex` subtracts assigned coarse centroids $c$ from normalized vectors $v$ to compute residual vectors $r = v - c$. `ProductQuantizer` is trained on these residual vectors.
+- **Dot-Product Residual Scoring**: Because subtracting centroids destroys unit-vector norm ($L_2 \neq 1.0$), Euclidean translation invariance does not apply to cosine distance. `IVFPQIndex` directly evaluates the exact algebraic expansion:
+  $$\text{Query} \cdot \text{Vector} = \text{Query} \cdot (c + r) = (\text{Query} \cdot c) + (\text{Query} \cdot r)$$
+  1. $\text{Query} \cdot c$: Coarse centroid dot product, captured during coarse cluster routing.
+  2. $\text{Query} \cdot r$: Sub-vector residual dot product, evaluated via fast pre-computed dot-product lookup tables (`computeDotProductTable` and `computeAsymmetricDotProduct`).
+- **Empirical Evaluation (GloVe-50, 100k vectors, 500 held-out queries, $N_{list}=316$)**:
+  - At $M=25$ ($8\times$ compression, 25 bytes/vec) and $N_{probe}=8$: achieves **14,588 median QPS** (28.3x brute force) with **0.7712 recall@10**.
+  - At $M=25$ and $N_{probe}=32$: reaches **0.8536 recall@10** at **5,226 median QPS** (10.1x brute force), matching PQ alone's recall while searching via IVF inverted lists.
+  - At $M=10$ ($20\times$ compression, 10 bytes/vec) and $N_{probe}=8$: reaches **15,941 median QPS** (30.9x brute force) with **0.4910 recall@10**.
+
 
 ## Storage Learning Notes
 

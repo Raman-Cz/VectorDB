@@ -32,6 +32,13 @@ public:
     // Fast ADC lookup: sums pre-computed sub-space distances using M byte codes.
     float computeAsymmetricDistance(const std::uint8_t* codes, const float* distance_table) const;
 
+    // Pre-computes a dot-product lookup table (size M x num_centroids) for Asymmetric Dot Product computation.
+    // Stores dot product from query sub-vectors to all sub-space centroids.
+    std::vector<float> computeDotProductTable(const float* query) const;
+
+    // Fast ADC lookup: sums pre-computed sub-space dot products using M byte codes.
+    float computeAsymmetricDotProduct(const std::uint8_t* codes, const float* dot_product_table) const;
+
     std::size_t dimensions() const;
     std::size_t num_sub_vectors() const;
     std::size_t sub_vector_dimensions() const;

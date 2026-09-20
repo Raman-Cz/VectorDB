@@ -91,3 +91,14 @@ Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before m
   - $M=25$ ($8\times$ compression, 25 bytes/vec): **1,076 median QPS**, recall@10 = **0.87** (increased from 0.61 pre-normalization).
 - Added unit test suite `product_quantizer_test` covering sub-vector partitioning, codebook training, 1-byte encoding/decoding, and ADC lookup accuracy. All CTest unit tests passed.
 
+### Inverted File with Product Quantization (IVFPQ): Complete
+
+- Implemented `IVFPQIndex` combining IVF coarse cluster pruning with PQ vector compression.
+- Solved residual cosine similarity scoring without re-normalization tricks by implementing exact dot-product expansion: $\text{Query} \cdot \text{Vector} = (\text{Query} \cdot c) + (\text{Query} \cdot r)$, where $c$ is coarse centroid and $r$ is residual.
+- Extended `ProductQuantizer` with `computeDotProductTable` and `computeAsymmetricDotProduct` to evaluate residual dot products via fast sub-vector lookup tables.
+- Evaluated on 100k GloVe-50 embeddings (500 random held-out queries, $N_{list}=316$):
+  - At $M=25$ (8x memory compression, 2.5MB index) and $N_{probe}=8$: achieved **14,588 median QPS** (28.3x brute force) with **0.7712 recall@10**.
+  - At $M=25$ and $N_{probe}=32$: reached **0.8536 recall@10** at **5,226 median QPS** (10.1x brute force).
+  - At $M=10$ (20x memory compression, 1.0MB index) and $N_{probe}=8$: reached **15,941 median QPS** with **0.4910 recall@10**.
+- Added unit test suite `ivfpq_index_test` covering build, memory accounting, cluster balance stats, and full-probing equivalence against `BruteForceIndex`. 100% CTest suite passed (5/5 tests).
+

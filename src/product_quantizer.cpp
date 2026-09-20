@@ -205,6 +205,39 @@ float ProductQuantizer::computeAsymmetricDistance(
     return distance;
 }
 
+std::vector<float> ProductQuantizer::computeDotProductTable(const float* query) const {
+    if (!isTrained()) {
+        throw std::logic_error("ProductQuantizer must be trained before computing dot-product tables.");
+    }
+
+    std::vector<float> dot_product_table(num_sub_vectors_ * num_centroids_);
+    for (std::size_t m = 0; m < num_sub_vectors_; ++m) {
+        const float* query_sub_vec = query + (m * sub_vector_dimensions_);
+        const float* sub_codebook = codebooks_.data() + (m * num_centroids_ * sub_vector_dimensions_);
+        float* table_row = dot_product_table.data() + (m * num_centroids_);
+
+        for (std::size_t k = 0; k < num_centroids_; ++k) {
+            const float* centroid_sub_vec = sub_codebook + (k * sub_vector_dimensions_);
+            float dot = 0.0F;
+            for (std::size_t d = 0; d < sub_vector_dimensions_; ++d) {
+                dot += query_sub_vec[d] * centroid_sub_vec[d];
+            }
+            table_row[k] = dot;
+        }
+    }
+    return dot_product_table;
+}
+
+float ProductQuantizer::computeAsymmetricDotProduct(
+    const std::uint8_t* codes,
+    const float* dot_product_table) const {
+    float dot_product = 0.0F;
+    for (std::size_t m = 0; m < num_sub_vectors_; ++m) {
+        dot_product += dot_product_table[(m * num_centroids_) + codes[m]];
+    }
+    return dot_product;
+}
+
 std::size_t ProductQuantizer::dimensions() const {
     return dimensions_;
 }

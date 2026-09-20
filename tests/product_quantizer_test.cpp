@@ -45,6 +45,14 @@ void testProductQuantizerBasic() {
 
     const float adc_dist = pq.computeAsymmetricDistance(codes.data(), dist_table.data());
     assert(adc_dist >= 0.0F);
+
+    // Verify dot-product table calculation (2 sub-vectors x 2 centroids)
+    const std::vector<float> dot_table = pq.computeDotProductTable(vec.data());
+    assert(dot_table.size() == 4);
+
+    const float adc_dot = pq.computeAsymmetricDotProduct(codes.data(), dot_table.data());
+    // Query is [s, 0, 0, s] (~[0.707, 0, 0, 0.707]), dot with matching centroid should be positive
+    assert(adc_dot > 0.0F);
 }
 
 void testPQIndexMemoryAndSearch() {

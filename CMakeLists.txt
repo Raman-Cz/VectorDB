@@ -9,7 +9,8 @@ add_library(vector_db_core
     src/glove_loader.cpp
     src/ivf_index.cpp
     src/product_quantizer.cpp
-    src/pq_index.cpp)
+    src/pq_index.cpp
+    src/ivfpq_index.cpp)
 target_include_directories(vector_db_core PUBLIC src)
 
 add_executable(vector_db src/main.cpp)
@@ -23,6 +24,9 @@ target_link_libraries(glove_benchmark PRIVATE vector_db_core)
 
 add_executable(pq_benchmark src/pq_benchmark.cpp)
 target_link_libraries(pq_benchmark PRIVATE vector_db_core)
+
+add_executable(ivfpq_benchmark src/ivfpq_benchmark.cpp)
+target_link_libraries(ivfpq_benchmark PRIVATE vector_db_core)
 
 enable_testing()
 add_executable(brute_force_index_test tests/brute_force_index_test.cpp)
@@ -41,3 +45,7 @@ set_tests_properties(glove_loader_test PROPERTIES WORKING_DIRECTORY ${CMAKE_SOUR
 add_executable(product_quantizer_test tests/product_quantizer_test.cpp)
 target_link_libraries(product_quantizer_test PRIVATE vector_db_core)
 add_test(NAME product_quantizer_test COMMAND product_quantizer_test)
+
+add_executable(ivfpq_index_test tests/ivfpq_index_test.cpp)
+target_link_libraries(ivfpq_index_test PRIVATE vector_db_core)
+add_test(NAME ivfpq_index_test COMMAND ivfpq_index_test)

@@ -148,6 +148,37 @@ On 2026-09-14, `pq_benchmark` evaluated 100,000 GloVe-50 vectors (uncompressed s
 
 At $M=5$, PQ achieves a **40x memory compression ratio** (shrinking 200-byte vectors to 5 bytes) and 2,919 QPS. At $M=25$ (8x compression), recall@10 reaches **0.87** with 1,076 QPS.
 
+## Inverted File with Product Quantization (IVFPQ)
+
+`IVFPQIndex` combines coarse cluster pruning (IVF) with vector compression (PQ). Vectors are assigned to coarse clusters, and their residual vectors ($r = v - c$) are quantized using sub-space codebooks into $M$ byte codes per vector. Scoring uses exact dot-product linear expansion: $\text{Query} \cdot v = (\text{Query} \cdot c) + \text{AsymmetricDotProduct}(\text{codes}, \text{table})$.
+
+```powershell
+.\build\Release\ivfpq_benchmark.exe data\glove.6B.50d.txt
+```
+
+### Recorded IVFPQ Run
+
+On 2026-09-20, `ivfpq_benchmark` evaluated 100,000 GloVe-50 vectors across 500 randomly sampled held-out queries with $N_{list} = 316$. Brute-force median QPS was 516.34.
+
+| $M$ (Sub-vecs) | Bytes/Vector | Compression | $N_{probe}$ | Build Time | median QPS | QPS Range | recall@10 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **10** | 10 B | **20.00x** | 1 | 54.23s | **32,838.13** | 30,132-33,114 | 0.3262 |
+| **10** | 10 B | **20.00x** | 8 | 54.23s | **15,941.54** | 15,549-16,154 | 0.4910 |
+| **10** | 10 B | **20.00x** | 32 | 54.23s | **5,545.57** | 5,468-5,553 | 0.5110 |
+| **25** | 25 B | **8.00x** | 1 | 62.28s | **44,092.49** | 41,986-44,896 | 0.4252 |
+| **25** | 25 B | **8.00x** | 8 | 62.28s | **14,588.49** | 14,473-14,769 | **0.7712** |
+| **25** | 25 B | **8.00x** | 32 | 62.28s | **5,226.70** | 5,093-5,272 | **0.8536** |
+
+### Index Comparison Overview
+
+| Index Strategy | Memory / Vector | $100\text{k}$ Index Size | Throughput (QPS) | Recall@10 | Key Trade-off |
+| --- | ---: | ---: | ---: | ---: | --- |
+| **Brute Force** | 200 B | 20.0 MB | 516.34 | 1.0000 | Ground truth reference; scans 100% of data |
+| **IVF Alone** ($N_{probe}=8$) | 200 B | 20.0 MB | 2,755.74 | 0.8400 | Fast search; no vector compression |
+| **PQ Alone** ($M=25$) | 25 B | 2.5 MB | 1,076.18 | 0.8700 | 8x memory reduction; exhaustive scan |
+| **IVFPQ** ($M=25, N_{probe}=8$) | **25 B** | **2.5 MB** | **14,588.49** | **0.7712** | **8x memory reduction + 28x throughput speedup** |
+| **IVFPQ** ($M=25, N_{probe}=32$) | **25 B** | **2.5 MB** | **5,226.70** | **0.8536** | **8x memory reduction + 10x throughput speedup at high recall** |
+
 ## Project Structure
 
 ```text
@@ -158,11 +189,14 @@ VectorDB/
     ivf_index.hpp               Basic CPU IVF interface, IVFClusterStats, and build config
     ivf_index.cpp               Spherical k-means, inverted lists, cluster stats, and nprobe search
     ivf_benchmark.cpp           QPS, cluster stats, and recall@K benchmark against exact search
-    product_quantizer.hpp       Sub-vector partitioning, K-means codebooks & ADC tables
-    product_quantizer.cpp       Codebook training, 1-byte encoding/decoding, ADC distance lookups
+    product_quantizer.hpp       Sub-vector partitioning, K-means codebooks, ADC & dot-product tables
+    product_quantizer.cpp       Codebook training, 1-byte encoding/decoding, ADC & dot-product lookups
     pq_index.hpp                Compressed in-memory index storing M bytes per vector
     pq_index.cpp                PQ compressed search using pre-computed ADC lookup tables
     pq_benchmark.cpp             Memory footprint, QPS, and recall@10 benchmark harness
+    ivfpq_index.hpp             IVFPQ interface (coarse IVF + residual PQ)
+    ivfpq_index.cpp             Inverted lists of PQ residual codes & dot-product residual scoring
+    ivfpq_benchmark.cpp           IVFPQ memory, QPS spread, and recall@10 benchmark harness
     glove_loader.cpp            GloVe text-file loader
     glove_benchmark.cpp         Random held-out embedding benchmark with median QPS & cluster stats
     main.cpp                    Benchmark command-line program
@@ -172,7 +206,8 @@ VectorDB/
     brute_force_index_test.cpp  Exact-result correctness test
     ivf_index_test.cpp          Full-probe equivalence, stats, and validation tests
     glove_loader_test.cpp       GloVe parsing test using a tiny fixture
-    product_quantizer_test.cpp  Sub-vector partitioning, encoding/decoding, and ADC tests
+    product_quantizer_test.cpp  Sub-vector partitioning, encoding/decoding, and ADC/dot-product tests
+    ivfpq_index_test.cpp        IVFPQ build, cluster stats, memory accounting & full-probe tests
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log
 ```
