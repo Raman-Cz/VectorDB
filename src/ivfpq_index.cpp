@@ -11,18 +11,19 @@
 namespace vectordb {
 namespace {
 
-void normalize(float* vector, const std::size_t dimensions) {
+bool normalize(float* vector, const std::size_t dimensions) {
     float squared_norm = 0.0F;
     for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
         squared_norm += vector[dimension] * vector[dimension];
     }
     if (squared_norm == 0.0F) {
-        return;
+        return false;
     }
     const float inverse_norm = 1.0F / std::sqrt(squared_norm);
     for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
         vector[dimension] *= inverse_norm;
     }
+    return true;
 }
 
 float dotProduct(const float* left, const float* right, const std::size_t dimensions) {
@@ -104,7 +105,10 @@ void IVFPQIndex::build(const std::vector<float>& vectors, const std::size_t max_
     // 1. Copy and unit-normalize all data vectors
     std::vector<float> normalized_vectors = vectors;
     for (std::size_t i = 0; i < vector_count_; ++i) {
-        normalize(normalized_vectors.data() + (i * dimensions_), dimensions_);
+        float* vector = normalized_vectors.data() + (i * dimensions_);
+        if (!normalize(vector, dimensions_)) {
+            throw std::invalid_argument("Vectors must have a non-zero norm.");
+        }
     }
 
     // 2. Initialize coarse centroids using spherical k-means
@@ -149,7 +153,9 @@ void IVFPQIndex::build(const std::vector<float>& vectors, const std::size_t max_
             std::vector<float> previous_centroid(centroid, centroid + dimensions_);
 
             std::copy_n(sum_ptr, dimensions_, centroid);
-            normalize(centroid, dimensions_);
+            if (!normalize(centroid, dimensions_)) {
+                std::copy_n(previous_centroid.data(), dimensions_, centroid);
+            }
 
             const float movement = 1.0F - dotProduct(previous_centroid.data(), centroid, dimensions_);
             total_movement += std::max(0.0F, movement);
@@ -211,7 +217,9 @@ std::vector<SearchResult> IVFPQIndex::search(
 
     // 1. Normalize query vector
     std::vector<float> normalized_query = query;
-    normalize(normalized_query.data(), dimensions_);
+    if (!normalize(normalized_query.data(), dimensions_)) {
+        throw std::invalid_argument("Queries must have a non-zero norm.");
+    }
 
     // 2. Compute dot products between query and all coarse centroids
     std::vector<std::pair<float, std::size_t>> centroid_scores(nlist_);

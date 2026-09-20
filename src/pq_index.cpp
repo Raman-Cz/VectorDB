@@ -8,18 +8,19 @@
 namespace vectordb {
 namespace {
 
-void normalize(float* vector, const std::size_t dimensions) {
+bool normalize(float* vector, const std::size_t dimensions) {
     float squared_norm = 0.0F;
     for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
         squared_norm += vector[dimension] * vector[dimension];
     }
     if (squared_norm == 0.0F) {
-        return;
+        return false;
     }
     const float inverse_norm = 1.0F / std::sqrt(squared_norm);
     for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
         vector[dimension] *= inverse_norm;
     }
+    return true;
 }
 
 // For Euclidean / ADC distance, LOWER score means closer neighbor (better result)
@@ -55,7 +56,10 @@ void PQIndex::trainAndBuild(const std::vector<float>& vectors, const std::size_t
     vector_count_ = vectors.size() / dimensions_;
     std::vector<float> normalized_vectors = vectors;
     for (std::size_t i = 0; i < vector_count_; ++i) {
-        normalize(normalized_vectors.data() + (i * dimensions_), dimensions_);
+        float* vector = normalized_vectors.data() + (i * dimensions_);
+        if (!normalize(vector, dimensions_)) {
+            throw std::invalid_argument("Vectors must have a non-zero norm.");
+        }
     }
 
     quantizer_.train(normalized_vectors, max_iterations);
@@ -84,7 +88,9 @@ std::vector<SearchResult> PQIndex::search(
     const std::size_t result_count = std::min(top_k, vector_count_);
 
     std::vector<float> normalized_query = query;
-    normalize(normalized_query.data(), dimensions_);
+    if (!normalize(normalized_query.data(), dimensions_)) {
+        throw std::invalid_argument("Queries must have a non-zero norm.");
+    }
 
     // Compute distance lookup table once per query (M x num_centroids)
     const std::vector<float> distance_table = quantizer_.computeDistanceTable(normalized_query.data());

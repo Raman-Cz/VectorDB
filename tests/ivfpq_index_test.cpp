@@ -86,6 +86,25 @@ void testValidation() {
         rejected_unbuilt_search = true;
     }
     assert(rejected_unbuilt_search);
+
+    bool rejected_zero_vector = false;
+    try {
+        vectordb::IVFPQIndex index(4, 2, 2);
+        index.build({0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F});
+    } catch (const std::invalid_argument&) {
+        rejected_zero_vector = true;
+    }
+    assert(rejected_zero_vector);
+
+    bool rejected_zero_query = false;
+    try {
+        vectordb::IVFPQIndex index(4, 2, 2);
+        index.build({1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F});
+        index.search({0.0F, 0.0F, 0.0F, 0.0F}, 1);
+    } catch (const std::invalid_argument&) {
+        rejected_zero_query = true;
+    }
+    assert(rejected_zero_query);
 }
 
 }  // namespace
