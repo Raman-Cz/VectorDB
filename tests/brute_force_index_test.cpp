@@ -1,6 +1,10 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <cassert>
+
 #include "brute_force_index.hpp"
 
-#include <cassert>
 #include <stdexcept>
 #include <vector>
 

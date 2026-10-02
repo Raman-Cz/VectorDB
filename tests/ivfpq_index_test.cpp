@@ -1,7 +1,11 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <cassert>
+
 #include "brute_force_index.hpp"
 #include "ivfpq_index.hpp"
 
-#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>

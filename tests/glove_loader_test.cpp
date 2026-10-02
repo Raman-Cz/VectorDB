@@ -1,6 +1,10 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <cassert>
+
 #include "glove_loader.hpp"
 
-#include <cassert>
 #include <stdexcept>
 
 int main() {

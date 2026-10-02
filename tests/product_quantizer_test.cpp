@@ -1,7 +1,11 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <cassert>
+
 #include "product_quantizer.hpp"
 #include "pq_index.hpp"
 
-#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
