@@ -1,4 +1,4 @@
-# Vector DB Engine Project
+# Vector DB Engine Project [![VectorDB CI](https://github.com/Raman-Cz/VectorDB/actions/workflows/ci.yml/badge.svg)](https://github.com/Raman-Cz/VectorDB/actions/workflows/ci.yml)
 
 A C++ vector database learning project focused on memory-aware storage, approximate nearest-neighbor search, cache-aware design, and WAL-based crash recovery.
 

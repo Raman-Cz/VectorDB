@@ -27,3 +27,7 @@ jobs:
 
       - name: Run unit tests
         run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Run Python WAL tests (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: python3 src/python/test_wal.py
