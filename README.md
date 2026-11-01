@@ -19,6 +19,37 @@ Phase 4 (ANN Algorithms) is complete: the exact brute-force baseline, failed-app
 
 The Python BM25 and WAL code are disposable learning exercises. Production-oriented database work remains planned for Phase 7.
 
+## Build and Test
+
+The commands in the sections below use Windows PowerShell paths (`.\build\Release\name.exe`). On macOS and Linux, CMake's default Makefile generator is single-config, so the build type is chosen at configure time and binaries land directly in `build/`.
+
+macOS (install CMake once with `brew install cmake`) or Linux:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+python3 src/python/test_wal.py
+```
+
+Run any benchmark from the repository root by dropping `.\build\Release\` and `.exe`, for example:
+
+```bash
+./build/vector_db
+./build/hnsw_benchmark data/glove.6B.50d.txt
+./build/hnsw_benchmark data/glove.6B.50d.txt 50 100000 500 10 3 16 200
+```
+
+The real-embedding benchmarks read `data/glove.6B.50d.txt`, which is ignored by Git. Download it once (about 820 MB compressed; only the 50-dimension file is extracted):
+
+```bash
+mkdir -p data
+curl -L -o data/glove.6B.zip https://nlp.stanford.edu/data/glove.6B.zip
+unzip -j data/glove.6B.zip glove.6B.50d.txt -d data && rm data/glove.6B.zip
+```
+
+If the Stanford server is unreachable, the same archive is published by Stanford NLP on Hugging Face: `https://huggingface.co/stanfordnlp/glove/resolve/main/glove.6B.zip`.
+
 ## Basic CPU IVF
 
 `IVFIndex` trains unit-normalized centroids with spherical k-means, assigns vector IDs to centroid-owned inverted lists, and probes the nearest lists at query time. It stores vectors once in a canonical contiguous array and uses the same normalized dot-product similarity as `BruteForceIndex`.
