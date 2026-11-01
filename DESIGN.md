@@ -97,7 +97,50 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings hig
   - At $M=25$ and $N_{probe}=32$: reaches **0.8536 recall@10** at **5,226 median QPS** (10.1x brute force), matching PQ alone's recall while searching via IVF inverted lists.
   - At $M=10$ ($20\times$ compression, 10 bytes/vec) and $N_{probe}=8$: reaches **15,941 median QPS** (30.9x brute force) with **0.4910 recall@10**.
 
+### Hierarchical Navigable Small World (HNSW): Paper Study Complete, Implementation Planned
+
+`HNSWIndex` implements a multi-layer graph index balancing high recall with sub-millisecond query latency.
+
+#### 1. Metric Convention Decision: Distance vs. Similarity
+The HNSW paper writes all algorithms and heap operations assuming **distance** (smaller is better). To prevent subtle comparison-inversion bugs while preserving exact equivalence with our unit-normalized cosine ground truth, all internal HNSW calculations define:
+$$\text{distance}(u, v) = 1.0F - (u \cdot v)$$
+For unit vectors, this distance is bounded in $[0.0, 2.0]$ and is strictly monotonic with cosine similarity. This preserves the paper's min-heap and max-heap logic intact without requiring inverted comparison operators.
+
+#### 2. Structural Mechanics & Skip-List Hierarchy
+- **Layers**: Top layers isolate long-range highway edges to skip across large distances with roughly logarithmic scaling on typical data. Layer 0 contains all vectors with short-range dense connections for precision.
+- **Level Assignment**: Each vector's maximum level $l$ is sampled via $l = \lfloor -\ln(\text{uniform}(0, 1)) \cdot m_L \rfloor$, with $m_L = \frac{1}{\ln(M)}$. This is the skip-list default (promotion probability $p = 1/M$), presented in the paper as a reasonable default rather than a proven optimum — $m_L$ is a separate tunable knob.
+- **Entry Point ($ep$)**: A persistent member variable pointing to the node at the topmost level ($L_{\text{max}}$). If a newly inserted node rolls level $l > L_{\text{max}}$, it becomes the new global entry point.
+- **Search Traversal**:
+  - Upper layers ($L_{\text{max}}$ down to 1): greedy single-best-hop routing ($ef = 1$) for maximum traversal speed.
+  - Layer 0: bounded priority-queue beam search tracked by $efSearch \ge K$.
+- **Heuristic Neighbor Selection**: Prunes candidate lists by enforcing directional diversity (only adding a neighbor if it is closer to the base node than to any already-selected neighbor). The paper selects **M** neighbors at every layer; $M_{\text{max}0} = 2M$ is only the shrink trigger cap, not the selection limit. The `keepPrunedConnections` flag is an optional experimental knob, not a default.
+- **Edge Shrinking**: When a bidirectional link overflows a neighbor's connection list beyond $M_{\text{max}}$ (or $M_{\text{max}0}$), the neighbor's edge list is re-pruned using the heuristic selection rule, never by simple truncation. Note: shrinking can leave nodes unreachable (no remaining inbound edges). Full reachability from the entry point is not guaranteed by the algorithm.
+
+#### 3. Heap Direction — Known Pitfall
+`searchLayer` returns a max-heap on distance. `top()` yields the **furthest** candidate, not the nearest. This affects:
+- `search()`: must drain the full heap and extract the k nearest from the sorted result, not pop k from the top.
+- `add()`: must carry the nearest candidate (not the furthest) as the entry point for the next layer down. The paper passes the whole result set W as entry points.
+
+Pseudocode that calls `candidates.top().id` to get the "best" entry is a bug — confirmed with a small repro. Implementation must follow the paper's Algorithms 1, 2, and 4 directly.
+
+#### 4. Analytical Memory Model (GloVe-50, $M=16$)
+- Vector coordinates: $50 \times 4\text{ B} = \mathbf{200\text{ B}}$
+- Layer 0 links ($M_{\text{max}0} = 2M = 32$, `uint32_t` IDs): $32 \times 4\text{ B} = \mathbf{128\text{ B}}$
+- Upper-layer links: Geometric series $\sum_{l=1}^{\infty} 16^{-l} = \frac{1}{15} \approx 6.7\%$ of Layer 0 links $\approx \mathbf{8.5\text{ B}}$
+- **Analytical payload total**: $\approx \mathbf{336.5\text{ B / vector}}$ (compared to 200 B raw and 25 B PQ payload).
+- *Allocator overhead note*: A dynamic `std::vector<std::vector<uint32_t>>` structure introduces allocator control blocks and heap fragmentation. Physical Resident Set Size (RSS) will be measured and compared against the analytical figure. The real HNSW vs IVFPQ memory ratio is approximately 5x (not 15-30x as raw payload alone might suggest, because IVFPQ's `std::vector<uint8_t>` per candidate carries ~60+ B of allocator overhead).
+
+#### 5. Implementation Guards
+- `ef >= k` must be enforced with `throw std::invalid_argument`, not `assert` (compiled out under `-DNDEBUG`).
+- `search()` must normalize the query and reject zero-norm inputs, matching the contract of all other indexes.
+- `selectNeighborsHeuristic` input must be sorted ascending by distance (drain and sort the heap first).
+- A per-query distance-evaluation counter will be added to the benchmark to measure actual computational cost.
+
+#### 6. Baseline & Performance Targets
+- **Recall Target**: IVFPQ tops out at $0.85$ recall@10 on GloVe-50. IVF reaches $0.97$ recall at $718$ QPS ($N_{list}=316, N_{probe}=32$).
+- **HNSW Target**: Reach $\ge 0.95$ recall@10 at $> 1,000$ QPS across $efSearch$ sweeps, surpassing the speed/recall ceiling of both IVF and IVFPQ.
 
 ## Storage Learning Notes
 
 LSM trees favor write-heavy workloads through append-only segments and compaction. B+ trees favor point lookups and range scans through balanced in-place structure. The WAL exercise demonstrates that replaying complete append-only records can restore state after an interrupted write.
+

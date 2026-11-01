@@ -102,3 +102,42 @@ Next: analyze the `nprobe` trade-off and decide whether to tune `nlist` before m
   - At $M=10$ (20x memory compression, 1.0MB index) and $N_{probe}=8$: reached **15,941 median QPS** with **0.4910 recall@10**.
 - Added unit test suite `ivfpq_index_test` covering build, memory accounting, cluster balance stats, and full-probing equivalence against `BruteForceIndex`. 100% CTest suite passed (5/5 tests).
 
+### HNSW Paper Reading: Complete
+
+Read the HNSW paper (Malkov & Yashunin, arXiv 1603.09320v4) end-to-end and traced through the algorithms in detail. Key understandings and nuances discovered:
+
+**Algorithm Structure**:
+- The algorithm has only two core subroutines: `searchLayer` (beam search with two heaps) and `selectNeighborsHeuristic` (diversity-based neighbor selection). `add()` and `search()` are composed from these.
+- `add()` has two phases: greedy descent (ef=1) through layers above the node's assigned level, then beam search + edge wiring from the node's level down to Layer 0.
+- `search()` has the same two-phase structure: greedy descent from top to Layer 1, then beam search at Layer 0 with ef=max(ef_search, k).
+- Each layer is not a separate graph — nodes that exist at level L also exist at every level below L, with separate neighbor lists per layer. There are no cross-layer edges; you descend layer by layer, carrying the current best node as the entry point.
+
+**Heap Direction Pitfall (caught by external review)**:
+- `searchLayer` returns a max-heap on distance (worst on top). Naively calling `top()` gives the **furthest** candidate, not the nearest. The paper passes the whole result set W down as the entry points. This affects both `search()` (must drain the full heap to extract the k nearest) and `add()` (must carry the nearest candidate down, not the furthest).
+- This was a concrete bug in my initial pseudocode that an external reviewer caught with a small repro.
+
+**Neighbor Selection Nuance**:
+- The paper's Algorithm 1 selects **M** neighbors at every layer. $M_{max0} = 2M$ is only the shrink trigger (the cap that fires re-pruning), not the selection limit. Using $2M$ at selection time makes the graph denser than the paper's analysis assumes. This is an explicit design choice, not a default.
+- `keepPrunedConnections` is an optional flag in the paper, not a default. Treat it as an experiment.
+
+**Level Assignment — Not Arbitrary**:
+- $m_L = 1 / \ln(M)$ is the skip-list default with promotion probability $p = 1/M$. This means roughly $1/M$ of nodes appear at each successive layer. The paper presents this as a reasonable default, not as a proven optimum — $m_L$ is a separate tunable knob.
+- My initial framing of "mathematically minimizes distance comparisons" was an overclaim.
+
+**Reachability**:
+- HNSW does not guarantee that every node is reachable from the entry point at Layer 0. Shrinking a neighbor's edge list can drop a node's last inbound edge. Only assert full reachability on tiny sets where $M \gg N$. On large builds, count and report unreachable nodes instead.
+
+**Implementation Guards (from review)**:
+- `assert(ef >= k)` is compiled out in Release builds with `-DNDEBUG`. Must use `throw std::invalid_argument` like the other indexes.
+- `search()` must normalize the query and check for zero-norm, matching the existing contract.
+- `selectNeighborsHeuristic` needs its input sorted ascending by distance (nearest first). Cannot pass a raw heap directly.
+- Edge shrink must re-run the full heuristic, not truncate.
+
+**Pre-Implementation Decision Record**:
+- Metric convention: `distance(u, v) = 1.0F - dot(u, v)`. Outputs convert back to cosine similarity = `1.0F - distance`.
+- Node IDs: `uint32_t` to save memory (half of `size_t`).
+- Vector storage: flat contiguous `std::vector<float>`, same pattern as the rest of the codebase.
+- Graph structure: `std::vector<std::vector<std::vector<uint32_t>>>` for v1 (simple, revisit in Phase 6).
+- "~3,200 distance computations for 100k vectors" is a rough ballpark. Will add a per-query distance-evaluation counter to the benchmark for precise measurement.
+- Analytical memory model (336.5 B/vector) excludes allocator overhead from nested `std::vector`. Will measure and report actual RSS alongside the analytical figure.
+

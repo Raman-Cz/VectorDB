@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. Steps 1-4 are complete: the exact brute-force baseline, failed-approach study, basic CPU IVF implementation, and Product Quantization (PQ) vector compression are complete and benchmarked.
+Phase 4 (ANN Algorithms) is in progress. Steps 1-5 are complete: the exact brute-force baseline, failed-approach study, basic CPU IVF, Product Quantization (PQ), and IVFPQ are implemented and benchmarked. The HNSW paper has been studied; implementation is next.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Phase 4 (ANN Algorithms) is in progress. Steps 1-4 are complete: the exact brute
 | 1 | Information-retrieval foundations | Done |
 | 2 | Linear algebra: dot product, normalization, dimensionality | Done |
 | 3 | Storage internals and WAL learning exercise | Done |
-| 4 | ANN algorithms: baseline, IVF, PQ, HNSW | In progress (PQ complete) |
+| 4 | ANN algorithms: baseline, IVF, PQ, IVFPQ, HNSW | In progress (HNSW paper study done, implementation next) |
 | 5 | Read FAISS source | Planned |
 | 6 | Memory and cache performance model | Planned |
 | 7 | Build the persistent vector database | Planned |
