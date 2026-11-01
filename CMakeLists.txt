@@ -10,7 +10,8 @@ add_library(vector_db_core
     src/ivf_index.cpp
     src/product_quantizer.cpp
     src/pq_index.cpp
-    src/ivfpq_index.cpp)
+    src/ivfpq_index.cpp
+    src/hnsw_index.cpp)
 target_include_directories(vector_db_core PUBLIC src)
 
 add_executable(vector_db src/main.cpp)
@@ -27,6 +28,9 @@ target_link_libraries(pq_benchmark PRIVATE vector_db_core)
 
 add_executable(ivfpq_benchmark src/ivfpq_benchmark.cpp)
 target_link_libraries(ivfpq_benchmark PRIVATE vector_db_core)
+
+add_executable(hnsw_benchmark src/hnsw_benchmark.cpp)
+target_link_libraries(hnsw_benchmark PRIVATE vector_db_core)
 
 enable_testing()
 add_executable(brute_force_index_test tests/brute_force_index_test.cpp)
@@ -49,3 +53,7 @@ add_test(NAME product_quantizer_test COMMAND product_quantizer_test)
 add_executable(ivfpq_index_test tests/ivfpq_index_test.cpp)
 target_link_libraries(ivfpq_index_test PRIVATE vector_db_core)
 add_test(NAME ivfpq_index_test COMMAND ivfpq_index_test)
+
+add_executable(hnsw_index_test tests/hnsw_index_test.cpp)
+target_link_libraries(hnsw_index_test PRIVATE vector_db_core)
+add_test(NAME hnsw_index_test COMMAND hnsw_index_test)

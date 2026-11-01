@@ -4,7 +4,7 @@ A C++ vector database learning project focused on memory-aware storage, approxim
 
 ## Current Progress
 
-Phase 4 (ANN Algorithms) is in progress. Steps 1-5 are complete: the exact brute-force baseline, failed-approach study, basic CPU IVF, Product Quantization (PQ), and IVFPQ are implemented and benchmarked. The HNSW paper has been studied; implementation is next.
+Phase 4 (ANN Algorithms) is complete: the exact brute-force baseline, failed-approach study, basic CPU IVF, Product Quantization (PQ), IVFPQ, and HNSW are implemented and benchmarked against exact search.
 
 | Phase | Topic | Status |
 | --- | --- | --- |
@@ -12,12 +12,43 @@ Phase 4 (ANN Algorithms) is in progress. Steps 1-5 are complete: the exact brute
 | 1 | Information-retrieval foundations | Done |
 | 2 | Linear algebra: dot product, normalization, dimensionality | Done |
 | 3 | Storage internals and WAL learning exercise | Done |
-| 4 | ANN algorithms: baseline, IVF, PQ, IVFPQ, HNSW | In progress (HNSW paper study done, implementation next) |
+| 4 | ANN algorithms: baseline, IVF, PQ, IVFPQ, HNSW | Done |
 | 5 | Read FAISS source | Planned |
 | 6 | Memory and cache performance model | Planned |
 | 7 | Build the persistent vector database | Planned |
 
 The Python BM25 and WAL code are disposable learning exercises. Production-oriented database work remains planned for Phase 7.
+
+## Build and Test
+
+The commands in the sections below use Windows PowerShell paths (`.\build\Release\name.exe`). On macOS and Linux, CMake's default Makefile generator is single-config, so the build type is chosen at configure time and binaries land directly in `build/`.
+
+macOS (install CMake once with `brew install cmake`) or Linux:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+python3 src/python/test_wal.py
+```
+
+Run any benchmark from the repository root by dropping `.\build\Release\` and `.exe`, for example:
+
+```bash
+./build/vector_db
+./build/hnsw_benchmark data/glove.6B.50d.txt
+./build/hnsw_benchmark data/glove.6B.50d.txt 50 100000 500 10 3 16 200
+```
+
+The real-embedding benchmarks read `data/glove.6B.50d.txt`, which is ignored by Git. Download it once (about 820 MB compressed; only the 50-dimension file is extracted):
+
+```bash
+mkdir -p data
+curl -L -o data/glove.6B.zip https://nlp.stanford.edu/data/glove.6B.zip
+unzip -j data/glove.6B.zip glove.6B.50d.txt -d data && rm data/glove.6B.zip
+```
+
+If the Stanford server is unreachable, the same archive is published by Stanford NLP on Hugging Face: `https://huggingface.co/stanfordnlp/glove/resolve/main/glove.6B.zip`.
 
 ## Basic CPU IVF
 
@@ -169,6 +200,39 @@ On 2026-09-20, `ivfpq_benchmark` evaluated 100,000 GloVe-50 vectors across 500 r
 | **25** | 25 B | **8.00x** | 8 | 62.28s | **14,588.49** | 14,473-14,769 | **0.7712** |
 | **25** | 25 B | **8.00x** | 32 | 62.28s | **5,226.70** | 5,093-5,272 | **0.8536** |
 
+## HNSW Graph Index
+
+`HNSWIndex` builds a multi-layer proximity graph one insert at a time. Upper layers hold a sparse sample of nodes with long-range links; layer 0 holds every vector. Search descends greedily through the upper layers, then runs a beam search of width `ef_search` on layer 0. Neighbors are chosen with the paper's diversity heuristic, and overflowing neighbor lists are re-pruned with the same heuristic rather than truncated.
+
+```powershell
+.\build\Release\hnsw_benchmark.exe data\glove.6B.50d.txt
+```
+
+Optional arguments are `dimensions index_count query_count top_k repetitions M ef_construction`. Without `M` and `ef_construction`, the benchmark sweeps `M` in `{8, 16, 32}` and `ef_construction` in `{100, 200, 400}`.
+
+### Recorded HNSW Run
+
+On 2026-11-01, `hnsw_benchmark` indexed 100,000 GloVe-50 vectors and evaluated 500 random held-out queries on an Apple Silicon Mac (single thread). Brute-force median QPS was 830.24 in the same run. `M = 16`, `ef_construction = 200`: build 12.24 s, top level 3, 0 unreachable nodes, 296 B/vector payload.
+
+| `ef_search` | median QPS | Speedup | Distances/query | recall@10 |
+| ---: | ---: | ---: | ---: | ---: |
+| 10 | 87,753 | 105.7x | 356 | 0.7194 |
+| 20 | 53,616 | 64.6x | 528 | 0.8366 |
+| 40 | 24,331 | 29.3x | 850 | 0.9258 |
+| 80 | 16,366 | 19.7x | 1,443 | **0.9694** |
+| 160 | 8,453 | 10.2x | 2,519 | **0.9900** |
+| 320 | 3,831 | 4.6x | 4,421 | 0.9980 |
+
+Grid summary at `ef_search = 80` (recall@10 / median QPS):
+
+| | `efC = 100` | `efC = 200` | `efC = 400` |
+| --- | ---: | ---: | ---: |
+| **M = 8** | 0.911 / 20,883 | 0.912 / 22,221 | 0.913 / 19,235 |
+| **M = 16** | 0.963 / 16,720 | 0.969 / 16,366 | 0.973 / 16,269 |
+| **M = 32** | 0.978 / 14,141 | 0.990 / 12,308 | 0.990 / 11,768 |
+
+`M` matters far more than `ef_construction` on this data. Larger `M` raises recall at a fixed `ef_search` but evaluates more distances per query. `M = 8, ef_construction = 100` left 1 node unreachable from the entry point, the edge-shrinking effect noted in DESIGN.md. Recall and distances/query are deterministic for a given seed; QPS is not. Single runs vary by roughly 10-20% (for example `ef_search = 40` above, whose sample range is 24,228-28,386), so compare recall and distances/query before small QPS gaps.
+
 ### Index Comparison Overview
 
 | Index Strategy | Memory / Vector | $100\text{k}$ Index Size | Throughput (QPS) | Recall@10 | Key Trade-off |
@@ -178,6 +242,17 @@ On 2026-09-20, `ivfpq_benchmark` evaluated 100,000 GloVe-50 vectors across 500 r
 | **PQ Alone** ($M=25$) | 25 B | 2.5 MB | 1,076.18 | 0.8700 | 8x memory reduction; exhaustive scan |
 | **IVFPQ** ($M=25, N_{probe}=8$) | **25 B** | **2.5 MB** | **14,588.49** | **0.7712** | **8x memory reduction + 28x throughput speedup** |
 | **IVFPQ** ($M=25, N_{probe}=32$) | **25 B** | **2.5 MB** | **5,226.70** | **0.8536** | **8x memory reduction + 10x throughput speedup at high recall** |
+
+QPS is only comparable within one machine. On 2026-11-01 all three ANN benchmarks were rerun back to back on the same idle Mac (brute force 818-830 QPS):
+
+| Index Strategy | Payload / Vector | Median QPS | Recall@10 |
+| --- | ---: | ---: | ---: |
+| IVF ($N_{probe}=32$) | 200 B | 4,959 | 0.97 |
+| IVFPQ ($M=25, N_{probe}=32$) | 25 B | 8,758 | 0.8538 |
+| **HNSW** ($M=16$, $ef_{search}=80$) | **296 B** | **16,366** | **0.9694** |
+| **HNSW** ($M=16$, $ef_{search}=160$) | **296 B** | **8,453** | **0.9900** |
+
+At matched recall (about 0.97), HNSW is about 3.3x faster than IVF. IVFPQ remains the memory option: it uses roughly 12x less payload, but its recall ceiling stays near 0.85.
 
 ## Project Structure
 
@@ -197,6 +272,9 @@ VectorDB/
     ivfpq_index.hpp             IVFPQ interface (coarse IVF + residual PQ)
     ivfpq_index.cpp             Inverted lists of PQ residual codes & dot-product residual scoring
     ivfpq_benchmark.cpp           IVFPQ memory, QPS spread, and recall@10 benchmark harness
+    hnsw_index.hpp              HNSW interface, build config, and search stats
+    hnsw_index.cpp              Layer search, diversity heuristic, edge shrinking, and greedy descent
+    hnsw_benchmark.cpp          M x ef_construction grid with ef_search sweep, distances/query, recall@10
     glove_loader.cpp            GloVe text-file loader
     glove_benchmark.cpp         Random held-out embedding benchmark with median QPS & cluster stats
     main.cpp                    Benchmark command-line program
@@ -208,6 +286,7 @@ VectorDB/
     glove_loader_test.cpp       GloVe parsing test using a tiny fixture
     product_quantizer_test.cpp  Sub-vector partitioning, encoding/decoding, and ADC/dot-product tests
     ivfpq_index_test.cpp        IVFPQ build, cluster stats, memory accounting & full-probe tests
+    hnsw_index_test.cpp         HNSW exactness, self-query order, recall, search cost & validation tests
   DESIGN.md                     Architectural choices and trade-offs
   notes.md                      Learning log
 ```

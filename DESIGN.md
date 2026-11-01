@@ -97,7 +97,7 @@ Sweeping $N_{list} \in \{100, 316, 1000, 2000\}$ on 100,000 GloVe embeddings hig
   - At $M=25$ and $N_{probe}=32$: reaches **0.8536 recall@10** at **5,226 median QPS** (10.1x brute force), matching PQ alone's recall while searching via IVF inverted lists.
   - At $M=10$ ($20\times$ compression, 10 bytes/vec) and $N_{probe}=8$: reaches **15,941 median QPS** (30.9x brute force) with **0.4910 recall@10**.
 
-### Hierarchical Navigable Small World (HNSW): Paper Study Complete, Implementation Planned
+### Hierarchical Navigable Small World (HNSW): Implemented
 
 `HNSWIndex` implements a multi-layer graph index balancing high recall with sub-millisecond query latency.
 
@@ -139,6 +139,19 @@ Pseudocode that calls `candidates.top().id` to get the "best" entry is a bug —
 #### 6. Baseline & Performance Targets
 - **Recall Target**: IVFPQ tops out at $0.85$ recall@10 on GloVe-50. IVF reaches $0.97$ recall at $718$ QPS ($N_{list}=316, N_{probe}=32$).
 - **HNSW Target**: Reach $\ge 0.95$ recall@10 at $> 1,000$ QPS across $efSearch$ sweeps, surpassing the speed/recall ceiling of both IVF and IVFPQ.
+
+#### 7. Measured Results (2026-11-01, same Mac for all indexes)
+- **Target met**: $M=16$, $ef_{construction}=200$ reaches **0.9694 recall@10 at 16,366 QPS** ($ef_{search}=80$) and **0.9900 at 8,453 QPS** ($ef_{search}=160$). At about 0.97 recall, IVF ($N_{probe}=32$) manages 4,959 QPS on the same machine, so HNSW is about 3.3x faster at matched recall.
+- **Search cost**: $ef_{search}=80$ evaluates about 1,443 distances per query, 1.4% of the 100,000 vectors. Brute force evaluates all of them; IVF at $N_{probe}=32$ scans about 10% plus 316 centroids.
+- **Payload below the analytical model**: measured 296 B/vector versus the 336.5 B estimate. The estimate assumes every layer-0 list is full at $M_{max0}=2M=32$ links. The diversity heuristic keeps fewer: (296 - 200) / 4 = about 24 links per node across all layers, because it rejects candidates that sit behind an already-kept neighbor.
+- **Parameter sensitivity**: $M$ dominates. At $ef_{search}=80$, raising $M$ from 8 to 32 lifts recall from 0.91 to 0.99, while doubling $ef_{construction}$ moves recall by under 0.01. $ef_{construction}$ mainly costs build time (12.2 s at 200 vs 22.6 s at 400 for $M=16$).
+- **Reachability**: $M=8$, $ef_{construction}=100$ left 1 node unreachable on layer 0, confirming that edge shrinking can orphan nodes. All other grid cells had 0.
+
+#### 8. Implementation Decisions Recorded
+- `ef_search < top_k` throws `std::invalid_argument` (section 5). The learning log's earlier `ef = max(ef_search, k)` idea was not used, so a misconfigured caller fails loudly instead of being silently widened.
+- `searchLayer` takes entry points as `(distance, id)` candidates so distances computed on one layer are reused on the next instead of recomputed.
+- A `std::vector<bool>` visited set is allocated per `searchLayer` call (12.5 KB at 100k nodes). A reusable visited list with a generation counter is a Phase 6 optimization.
+- Physical RSS was not measured. Peak RSS in the benchmark is dominated by the loaded GloVe strings and the brute-force copy, so isolating the graph needs a dedicated harness; this moves to Phase 6 with the allocator-overhead question.
 
 ## Storage Learning Notes
 
